@@ -1925,6 +1925,18 @@ void FlexDRWorker::route_queue_main(std::queue<RouteQueueEntry>& rerouteQueue)
         initMazeCost_via_helper(net, false);
       }
       net->clear();
+
+      // DTCO Pin Access Evaluation: Record Rip-up (I10)
+      if (eval_mgr_  && router_cfg_->DO_PAE && numReroute > 0) {
+        for (auto& pin : net->getPins()) {
+          if (pin->isInstPin()) {
+            frInstTerm* instTerm = static_cast<frInstTerm*>(pin->getFrTerm());
+            frInst* inst = instTerm->getInst();
+            eval_mgr_->countPatternRipup(inst);
+          }
+        }
+      }
+
       if (getDRIter() >= beginDebugIter) {
         logger_->info(DRT, 2002, "Routing net {}", net->getFrNet()->getName());
       }

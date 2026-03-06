@@ -99,7 +99,8 @@ class FlexDR
          frDesign* designIn,
          utl::Logger* loggerIn,
          odb::dbDatabase* dbIn,
-         RouterConfiguration* router_cfg);
+         RouterConfiguration* router_cfg,
+         PinAccessEvalMgr* eval_mgr);
   ~FlexDR();
   // getters
   frTechObject* getTech() const { return design_->getTech(); }
@@ -146,6 +147,7 @@ class FlexDR
   utl::Logger* logger_;
   odb::dbDatabase* db_;
   RouterConfiguration* router_cfg_;
+  PinAccessEvalMgr* eval_mgr_;
   std::vector<std::vector<
       frOrderedIdMap<frNet*, std::set<std::pair<odb::Point, frLayerNum>>>>>
       gcell2BoundaryPin_;
@@ -313,11 +315,13 @@ class FlexDRWorker
   FlexDRWorker(FlexDRViaData* via_data,
                frDesign* design,
                utl::Logger* logger,
-               RouterConfiguration* router_cfg)
+               RouterConfiguration* router_cfg,
+               PinAccessEvalMgr* eval_mgr)
       : design_(design),
         logger_(logger),
         router_cfg_(router_cfg),
         via_data_(via_data),
+        eval_mgr_(eval_mgr),
         mazeEndIter_(1),
         ripupMode_(RipUpMode::ALL),
         workerDRCCost_(router_cfg->ROUTESHAPECOST),
@@ -480,7 +484,8 @@ class FlexDRWorker
                                             FlexDRViaData* via_data,
                                             frDesign* design,
                                             utl::Logger* logger,
-                                            RouterConfiguration* router_cfg);
+                                            RouterConfiguration* router_cfg,
+                                            PinAccessEvalMgr* eval_mgr);
 
   // distributed
   void setDistributed(dst::Distributed* dist,
@@ -534,6 +539,7 @@ class FlexDRWorker
   frDesign* design_{nullptr};
   utl::Logger* logger_{nullptr};
   RouterConfiguration* router_cfg_{nullptr};
+  PinAccessEvalMgr* eval_mgr_{nullptr};
   AbstractDRGraphics* graphics_{nullptr};  // owned by FlexDR
   frDebugSettings* debugSettings_{nullptr};
   FlexDRViaData* via_data_{nullptr};

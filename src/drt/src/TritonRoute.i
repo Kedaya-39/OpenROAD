@@ -67,7 +67,11 @@ void detailed_route_cmd(const char* outputMazeFile,
                         int minAccessPoints,
                         bool saveGuideUpdates,
                         const char* repairPDNLayerName,
-                        int drcReportIterStep)
+                        int drcReportIterStep,
+                        bool doPae,
+                        bool doPaeEnhance,
+                        const char* paeReportFile,
+                        const char* paeParaFile)
 {
   auto* router = ord::OpenRoad::openRoad()->getTritonRoute();
   const int num_threads = ord::OpenRoad::openRoad()->getThreadCount();
@@ -91,6 +95,10 @@ void detailed_route_cmd(const char* outputMazeFile,
                     verbose,
                     cleanPatches,
                     !noPa,
+                    doPae,
+                    doPaeEnhance,
+                    paeReportFile,
+                    paeParaFile,
                     singleStepDR,
                     minAccessPoints,
                     saveGuideUpdates,
@@ -211,6 +219,13 @@ void fix_max_spacing_cmd()
   const int num_threads = ord::OpenRoad::openRoad()->getThreadCount();
   router->fixMaxSpacing(num_threads);
 }
+
+void report_pin_acc_cmd(const char* report_file)
+{
+  auto* router = ord::OpenRoad::openRoad()->getTritonRoute();
+  router->reportPinAccessEval(report_file);
+}
+
 void step_end()
 {
   auto* router = ord::OpenRoad::openRoad()->getTritonRoute();
