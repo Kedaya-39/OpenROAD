@@ -1872,7 +1872,7 @@ void FlexDR::fixMaxSpacing()
   for (size_t i = 0; i < merged_regions.size(); i++) {
     auto route_box = merged_regions.at(i);
     auto worker = std::make_unique<FlexDRWorker>(
-        &via_data_, design_, logger_, router_cfg_);
+        &via_data_, design_, logger_, router_cfg_, eval_mgr_);
     odb::Rect ext_box;
     odb::Rect drc_box;
     route_box.bloat(router_cfg_->MTSAFEDIST, ext_box);
