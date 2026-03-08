@@ -77,6 +77,9 @@ master分支用于保持与原仓库的同步。
 main分支是我的毕设的主分支。
 dev分支是我的日常开发分支。
 
+你只能执行git命令中读取类命令(如git log)，不能执行写类命令(如git add, commit, push)。
+你是在办公环境（win10）中。我常用git自带的bash。win的cmd太难用了。
+
 办公环境和开发环境各有一个openroad仓库。两个repo源代码的最后一次commit是相同的。开发环境的openroad已完成配置并能编译。办公环境的代码commit需要同步至开发环境已进行编译、测试。
 
 注意，只对标准单元进行引脚可访问性评价，不处理macro单元和IO pin/term。
