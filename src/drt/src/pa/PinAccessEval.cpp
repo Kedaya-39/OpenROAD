@@ -25,9 +25,10 @@
 namespace drt {
 
 PinAccessEvalMgr::PinAccessEvalMgr(frDesign* design,
+                                 odb::dbDatabase* db,
                                  FlexPA* pa,
                                  utl::Logger* logger)
-    : design_(design), pa_(pa), logger_(logger)
+    : design_(design), db_(db), pa_(pa), logger_(logger)
 {
 }
 
@@ -87,7 +88,7 @@ PAEUClassMetrics* PinAccessEvalMgr::ensureUClassMetrics(UniqueClass* uclass)
 PAETechKey PinAccessEvalMgr::getPAETechKey() const
 {
   PAETechKey key;
-  auto tech = design_->getTech()->getDbTech();
+  auto tech = db_->getTech();
   key.tech_name = tech->getName();
   key.dbu = tech->getDbUnitsPerMicron();
   key.manufacturing_grid = (double) tech->getManufacturingGrid() / key.dbu;

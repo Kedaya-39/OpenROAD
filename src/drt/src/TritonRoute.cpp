@@ -1031,7 +1031,7 @@ int TritonRoute::main()
     router_cfg_->DO_PAE = true;
     if (!pin_access_eval_mgr_) {
       pin_access_eval_mgr_ = std::make_unique<PinAccessEvalMgr>(
-          getDesign(), nullptr, logger_);
+          getDesign(), db_, nullptr, logger_);
     }
     if (!router_cfg_->PAE_PARA_FILE.empty()) {
       pin_access_eval_mgr_->importParams(router_cfg_->PAE_PARA_FILE);
@@ -1111,7 +1111,7 @@ void TritonRoute::pinAccess(const std::vector<odb::dbInst*>& target_insts)
   if (router_cfg_->DO_PA) {
     if (!pin_access_eval_mgr_) {
       pin_access_eval_mgr_ = std::make_unique<PinAccessEvalMgr>(
-          getDesign(), nullptr, logger_);
+          getDesign(), db_, nullptr, logger_);
     }
     if (!router_cfg_->PAE_PARA_FILE.empty()) {
       pin_access_eval_mgr_->importParams(router_cfg_->PAE_PARA_FILE);

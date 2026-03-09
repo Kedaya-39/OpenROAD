@@ -50,7 +50,7 @@ struct PAETechKey
  */
 struct HistPatternData
 {
-  int i1, i2, i3, i7;
+  int i1, i2, i3, i4, i7;
   int n_selected, n_ripup;
   int s_static, s_dynamic, s_final;
 };
@@ -113,7 +113,7 @@ struct PAEUClassMetrics
 class PinAccessEvalMgr
 {
  public:
-  PinAccessEvalMgr(frDesign* design, FlexPA* pa, utl::Logger* logger);
+  PinAccessEvalMgr(frDesign* design, odb::dbDatabase* db, FlexPA* pa, utl::Logger* logger);
   ~PinAccessEvalMgr() = default;
 
   // --- Core Lifecycle Methods ---
@@ -193,6 +193,7 @@ class PinAccessEvalMgr
 
  private:
   frDesign* design_;
+  odb::dbDatabase* db_;
   FlexPA* pa_;
   utl::Logger* logger_;
 
