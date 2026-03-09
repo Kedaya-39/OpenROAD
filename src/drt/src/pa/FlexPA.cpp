@@ -2,6 +2,7 @@
 // Copyright (c) 2019-2025, The OpenROAD Authors
 
 #include "pa/FlexPA.h"
+#include "pa/PinAccessEval.h"
 
 #include <cstdint>
 #include <fstream>

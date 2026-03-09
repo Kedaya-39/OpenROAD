@@ -79,6 +79,7 @@ class FlexDPNode;
 class AbstractPAGraphics;
 class frViaDef;
 class frInstTerm;
+class PinAccessEvalMgr;
 
 class FlexPA
 {
