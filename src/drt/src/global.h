@@ -50,7 +50,7 @@ struct RouterConfiguration
   bool ENABLE_VIA_GEN = true;
   bool CLEAN_PATCHES = false;
   bool DO_PA = true;
-  bool DO_PAE = true;
+  bool DO_PAE = false;
   bool DO_PAE_ENHANCE = false;
   bool SINGLE_STEP_DR = false;
   bool SAVE_GUIDE_UPDATES = false;
