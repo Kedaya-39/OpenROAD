@@ -1532,7 +1532,7 @@ void TritonRoute::reportPinAccessEval(const std::string& report_file)
     pin_access_eval_mgr_->calculateScores();
     pin_access_eval_mgr_->report(report_file);
   } else {
-    logger_->error(utl::DRT, 1006, "Pin access evaluation manager not initialized.");
+    logger_->error(utl::DRT, 1008, "Pin access evaluation manager not initialized.");
   }
 }
 

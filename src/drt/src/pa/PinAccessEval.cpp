@@ -170,7 +170,7 @@ void PinAccessEvalMgr::runStaticAnalysis()
     return;
   }
 
-  logger_->info(utl::DRT, 1010, "Starting Pin Access Static Analysis.");
+  logger_->info(utl::DRT, 1014, "Starting Pin Access Static Analysis.");
 
   auto& unique_classes = pa_->getUniqueInsts()->getUniqueClasses();
   for (auto& uc_ptr : unique_classes) {
@@ -491,7 +491,7 @@ void PinAccessEvalMgr::report(const std::string& filename)
 {
   std::ofstream out(filename);
   if (!out.is_open()) {
-    logger_->error(utl::DRT, 1011, "Failed to open PAE report for writing: {}", filename);
+    logger_->error(utl::DRT, 1015, "Failed to open PAE report for writing: {}", filename);
     return;
   }
 
@@ -646,7 +646,7 @@ bool PinAccessEvalMgr::importReport(const std::string& filename)
       std::getline(tech_ss, hist_grid_str, ',');
       
       if (hist_name.empty() || hist_dbu_str.empty() || hist_grid_str.empty()) {
-        logger_->warn(utl::DRT, 1012, "Malformed PAETechKey line, skipping import.");
+        logger_->warn(utl::DRT, 1016, "Malformed PAETechKey line, skipping import.");
         return false;
       }
 
@@ -657,7 +657,7 @@ bool PinAccessEvalMgr::importReport(const std::string& filename)
 
       auto current_tech = getPAETechKey();
       if (!(hist_tech == current_tech)) {
-        logger_->warn(utl::DRT, 1012, "PAE Tech mismatch, skipping import.");
+        logger_->warn(utl::DRT, 1017, "PAE Tech mismatch, skipping import.");
         return false;
       }
       continue;
