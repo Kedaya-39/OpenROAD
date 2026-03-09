@@ -263,8 +263,12 @@ void TritonRoute::debugSingleWorker(const std::string& dumpDir,
   std::string workerStr((std::istreambuf_iterator<char>(workerFile)),
                         std::istreambuf_iterator<char>());
   workerFile.close();
-  auto worker = FlexDRWorker::load(
-      workerStr, &viaData, design_.get(), logger_, router_cfg_.get());
+  auto worker = FlexDRWorker::load(workerStr,
+                                   &viaData,
+                                   design_.get(),
+                                   logger_,
+                                   router_cfg_.get(),
+                                   pin_access_eval_mgr_.get());
   std::unique_ptr<AbstractDRGraphics> graphics
       = debug_->debugDR ? graphics_factory_->makeUniqueDRGraphics() : nullptr;
   worker->setGraphics(graphics.get());
@@ -1119,19 +1123,23 @@ void TritonRoute::pinAccess(const std::vector<odb::dbInst*>& target_insts)
     if (!router_cfg_->PAE_REPORT_FILE.empty()) {
       pin_access_eval_mgr_->importReport(router_cfg_->PAE_REPORT_FILE);
     }
-    pa_ = std::make_unique<FlexPA>(
-        getDesign(), logger_, dist_, router_cfg_.get(), pin_access_eval_mgr_.get());
-  pa_->setTargetInstances(target_insts);
-  if (debug_->debugPA) {
-    pa_->setDebug(graphics_factory_->makeUniquePAGraphics());
+    pa_ = std::make_unique<FlexPA>(getDesign(),
+                                   logger_,
+                                   dist_,
+                                   router_cfg_.get(),
+                                   pin_access_eval_mgr_.get());
+    pa_->setTargetInstances(target_insts);
+    if (debug_->debugPA) {
+      pa_->setDebug(graphics_factory_->makeUniquePAGraphics());
+    }
+    if (distributed_) {
+      pa_->setDistributed(dist_ip_, dist_port_, shared_volume_, cloud_sz_);
+      dist_pool_->join();
+    }
+    pa_->main();
+    io::Writer writer(getDesign(), logger_);
+    writer.updateDb(db_, router_cfg_.get(), true);
   }
-  if (distributed_) {
-    pa_->setDistributed(dist_ip_, dist_port_, shared_volume_, cloud_sz_);
-    dist_pool_->join();
-  }
-  pa_->main();
-  io::Writer writer(getDesign(), logger_);
-  writer.updateDb(db_, router_cfg_.get(), true);
 }
 
 void TritonRoute::deleteInstancePAData(frInst* inst, bool delete_inst)

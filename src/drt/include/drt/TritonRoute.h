@@ -104,6 +104,10 @@ class TritonRoute
   {
     return router_cfg_.get();
   }
+  PinAccessEvalMgr* getPinAccessEvalMgr() const
+  {
+    return pin_access_eval_mgr_.get();
+  }
 
   int main();
   void endFR();
