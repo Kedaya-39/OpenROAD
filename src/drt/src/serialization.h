@@ -770,6 +770,7 @@ void serializeGlobals(Archive& ar, RouterConfiguration* router_cfg)
   (ar) & router_cfg->DO_PAE_ENHANCE;
   (ar) & router_cfg->PAE_HASH_SEED;
   (ar) & router_cfg->PAE_REPORT_FILE;
+  (ar) & router_cfg->PAE_PARA_FILE;
   (ar) & router_cfg->PAE_W1;
   (ar) & router_cfg->PAE_W2;
   (ar) & router_cfg->PAE_W3;

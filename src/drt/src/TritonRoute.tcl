@@ -479,6 +479,25 @@ proc detailed_route_set_unidirectional_layer { args } {
   drt::detailed_route_set_unidirectional_layer $args
 }
 
+sta::define_cmd_args "report_pin_acc" {
+    [-file filename]
+}
+
+proc report_pin_acc { args } {
+  sta::parse_key_args "report_pin_acc" args \
+    keys {-file} \
+    flags {}
+  sta::check_argc_eq0 "report_pin_acc" $args
+
+  if { [info exists keys(-file)] } {
+    set report_file $keys(-file)
+  } else {
+    set report_file ""
+  }
+
+  drt::report_pin_acc_cmd $report_file
+}
+
 namespace eval drt {
 proc step_dr { args } {
   # args match FlexDR::SearchRepairArgs
@@ -523,23 +542,5 @@ proc fix_max_spacing { args } {
   sta::check_argc_eq0 "fix_max_spacing" $args
   drt::fix_max_spacing_cmd
 }
-
-sta::define_cmd_args "report_pin_acc" {
-    [-report_file filename]
 }
 
-proc report_pin_acc { args } {
-  sta::parse_key_args "report_pin_acc" args \
-    keys {-report_file} \
-    flags {}
-  sta::check_argc_eq0 "report_pin_acc" $args
-
-  if { [info exists keys(-report_file)] } {
-    set report_file $keys(-report_file)
-  } else {
-    set report_file ""
-  }
-
-  drt::report_pin_acc_cmd $report_file
-}
-}

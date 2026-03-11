@@ -95,72 +95,87 @@ PAETechKey PinAccessEvalMgr::getPAETechKey() const
   return key;
 }
 
-std::string PinAccessEvalMgr::getPAEUClassKey(UniqueClass* uclass) const
+std::string PinAccessEvalMgr::getPAEUClassKey(UniqueClass* uclass)
 {
-  std::ostringstream oss;
-  const auto& offsets = uclass->getOffsets();
-  oss << "UC_" << uclass->getMaster()->getName() << "_" << (int) uclass->getOrient()
-      << "_" << (offsets.size() > 0 ? offsets[0] : 0) << "_"
-      << (offsets.size() > 1 ? offsets[1] : 0);
-  return oss.str();
+  if (auto m = ensureUClassMetrics(uclass)) {
+    if (!m->PAEUClassKey.empty()) {
+      return m->PAEUClassKey;
+    }
+    std::ostringstream oss;
+    const auto& offsets = uclass->getOffsets();
+    oss << "UC_" << uclass->getMaster()->getName() << "_" << (int) uclass->getOrient()
+        << "_" << (offsets.size() > 0 ? offsets[0] : 0) << "_"
+        << (offsets.size() > 1 ? offsets[1] : 0);
+    m->PAEUClassKey = oss.str();
+    return m->PAEUClassKey;
+  }
+  return "";
 }
 
 std::string PinAccessEvalMgr::getPAEPatternKey(UniqueClass* uclass,
-                                               FlexPinAccessPattern* pattern) const
+                                               FlexPinAccessPattern* pattern)
 {
-  const auto* cfg = getRouterConfig();
+  if (auto m = ensurePatternMetrics(pattern)) {
+    if (!m->PAEPatternKey.empty()) {
+      return m->PAEPatternKey;
+    }
 
-  // Sort APs to ensure deterministic hash
-  struct APDesc
-  {
-    int x, y, layer;
-    uint8_t dirs;
-    bool operator<(const APDesc& other) const
+    const auto* cfg = getRouterConfig();
+
+    // Sort APs to ensure deterministic hash
+    struct APDesc
     {
-      if (x != other.x)
-        return x < other.x;
-      if (y != other.y)
-        return y < other.y;
-      if (layer != other.layer)
-        return layer < other.layer;
-      return dirs < other.dirs;
+      int x, y, layer;
+      uint8_t dirs;
+      bool operator<(const APDesc& other) const
+      {
+        if (x != other.x)
+          return x < other.x;
+        if (y != other.y)
+          return y < other.y;
+        if (layer != other.layer)
+          return layer < other.layer;
+        return dirs < other.dirs;
+      }
+    };
+
+    std::vector<APDesc> descs;
+    for (auto ap : pattern->getPattern()) {
+      if (!ap)
+        continue;
+      APDesc d;
+      d.x = ap->getPoint().getX();
+      d.y = ap->getPoint().getY();
+      d.layer = ap->getLayerNum();
+      d.dirs = 0;
+      const auto& acc = ap->getAccess();
+      for (int i = 0; i < 6; ++i) {
+        if (acc[i])
+          d.dirs |= (1 << i);
+      }
+      descs.push_back(d);
     }
-  };
+    std::sort(descs.begin(), descs.end());
 
-  std::vector<APDesc> descs;
-  for (auto ap : pattern->getPattern()) {
-    if (!ap)
-      continue;
-    APDesc d;
-    d.x = ap->getPoint().getX();
-    d.y = ap->getPoint().getY();
-    d.layer = ap->getLayerNum();
-    d.dirs = 0;
-    const auto& acc = ap->getAccess();
-    for (int i = 0; i < 6; ++i) {
-      if (acc[i])
-        d.dirs |= (1 << i);
+    // Use a simple and efficient hash combination (similar to boost::hash_combine)
+    size_t hash_val = cfg ? (size_t) cfg->PAE_HASH_SEED : 0;
+    auto combine = [](size_t& seed, int v) {
+      seed ^= std::hash<int>{}(v) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+    };
+
+    for (const auto& d : descs) {
+      combine(hash_val, d.x);
+      combine(hash_val, d.y);
+      combine(hash_val, d.layer);
+      combine(hash_val, (int) d.dirs);
     }
-    descs.push_back(d);
+
+    std::string uclass_id = getPAEUClassKey(uclass);
+    // Format: {PAEUClassKey}_P_{num of access points}_{hash rst of aps info}
+    m->PAEPatternKey = uclass_id + "_P_" + std::to_string(descs.size()) + "_" + std::to_string(hash_val);
+    return m->PAEPatternKey;
   }
-  std::sort(descs.begin(), descs.end());
-
-  // Use a simple and efficient hash combination (similar to boost::hash_combine)
-  size_t hash_val = cfg ? (size_t) cfg->PAE_HASH_SEED : 0;
-  auto combine = [](size_t& seed, int v) {
-    seed ^= std::hash<int>{}(v) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-  };
-
-  for (const auto& d : descs) {
-    combine(hash_val, d.x);
-    combine(hash_val, d.y);
-    combine(hash_val, d.layer);
-    combine(hash_val, (int) d.dirs);
-  }
-
-  std::string uclass_id = getPAEUClassKey(uclass);
-  // Format: {PAEUClassKey}_P_{num of access points}_{hash rst of aps info}
-  return uclass_id + "_P_" + std::to_string(descs.size()) + "_" + std::to_string(hash_val);
+  return "";
 }
 
 void PinAccessEvalMgr::runStaticAnalysis()
@@ -212,7 +227,7 @@ void PinAccessEvalMgr::updatePatternScoreFactor(UniqueClass* uclass,
   const auto* cfg = getRouterConfig();
 
   // Historical Import Support
-  if (cfg->DO_PAE_ENHANCE) {
+  if (report_imported_) {
     std::string patKey = getPAEPatternKey(uclass, pattern);
     auto hist_it = hist_pattern_db_.find(patKey);
     if (hist_it != hist_pattern_db_.end()) {
@@ -602,8 +617,12 @@ void PinAccessEvalMgr::report(const std::string& filename)
 
 bool PinAccessEvalMgr::importReport(const std::string& filename)
 {
+  logger_->info(utl::DRT, 1018, "Importing PAE report from {}.", filename);
   std::ifstream in(filename);
-  if (!in.is_open()) return false;
+  if (!in.is_open()) {
+    logger_->warn(utl::DRT, 1012, "Failed to open PAE report for reading: {}", filename);
+    return false;
+  }
 
   std::string line;
   enum Section { NONE, TECH, PARAMS, CELL, UCLASS, PATTERN, AP };
@@ -612,8 +631,9 @@ bool PinAccessEvalMgr::importReport(const std::string& filename)
   auto cfg = const_cast<RouterConfiguration*>(getRouterConfig());
 
   while (std::getline(in, line)) {
-    if (line.empty() || line[0] == '#') continue;
+    if (line.empty()) continue;
     
+    // Check for section headers first
     if (line.find("### PAETechKey:") != std::string::npos) {
       current_section = TECH;
       continue;
@@ -622,21 +642,24 @@ bool PinAccessEvalMgr::importReport(const std::string& filename)
       continue;
     } else if (line.find("### CELL SCORE:") != std::string::npos) {
       current_section = CELL;
-      std::getline(in, line); // Skip header line
+      if (!std::getline(in, line)) break; // Skip header line
       continue;
     } else if (line.find("### UNIQUE CLASS SCORE:") != std::string::npos) {
       current_section = UCLASS;
-      std::getline(in, line); // Skip header line
+      if (!std::getline(in, line)) break; // Skip header line
       continue;
     } else if (line.find("### ACCESS PATTERN SCORE:") != std::string::npos) {
       current_section = PATTERN;
-      std::getline(in, line); // Skip header line
+      if (!std::getline(in, line)) break; // Skip header line
       continue;
     } else if (line.find("### PATTERN DETAIL") != std::string::npos) {
       current_section = AP;
-      std::getline(in, line); // Skip header line
+      if (!std::getline(in, line)) break; // Skip header line
       continue;
     }
+
+    // Skip other comments
+    if (line[0] == '#') continue;
 
     if (current_section == TECH) {
       std::stringstream tech_ss(line);
@@ -652,12 +675,12 @@ bool PinAccessEvalMgr::importReport(const std::string& filename)
 
       PAETechKey hist_tech;
       hist_tech.tech_name = hist_name;
-      hist_tech.dbu = std::stoi(hist_dbu_str);
-      hist_tech.manufacturing_grid = std::stod(hist_grid_str);
+        hist_tech.dbu = std::stoi(hist_dbu_str);
+        hist_tech.manufacturing_grid = std::stod(hist_grid_str);
 
       auto current_tech = getPAETechKey();
       if (!(hist_tech == current_tech)) {
-        logger_->warn(utl::DRT, 1017, "PAE Tech mismatch, skipping import.");
+        logger_->warn(utl::DRT, 1017, "PAE Tech mismatch, skipping import. Design: {}, Report: {}", current_tech.tech_name, hist_tech.tech_name);
         return false;
       }
       continue;
@@ -672,30 +695,34 @@ bool PinAccessEvalMgr::importReport(const std::string& filename)
         if (pos == std::string::npos) continue;
         std::string key = pair.substr(0, pos);
         std::string val = pair.substr(pos + 1);
-        if (key == "W1") cfg->PAE_W1 = std::stod(val);
-        else if (key == "W2") cfg->PAE_W2 = std::stod(val);
-        else if (key == "W3") cfg->PAE_W3 = std::stod(val);
-        else if (key == "W4") cfg->PAE_W4 = std::stod(val);
-        else if (key == "W5") cfg->PAE_W5 = std::stod(val);
-        else if (key == "W6") cfg->PAE_W6 = std::stod(val);
-        else if (key == "W7") cfg->PAE_W7 = std::stod(val);
-        else if (key == "N_TH") cfg->PAE_N_TH = std::stoi(val);
-        else if (key == "SEED") cfg->PAE_HASH_SEED = std::stoi(val);
-        else if (key == "I1_S11") cfg->PAE_I1_S11 = std::stoi(val);
-        else if (key == "I1_S12") cfg->PAE_I1_S12 = std::stoi(val);
-        else if (key == "I1_S13") cfg->PAE_I1_S13 = std::stoi(val);
-        else if (key == "I1_S14") cfg->PAE_I1_S14 = std::stoi(val);
-        else if (key == "I1_S15") cfg->PAE_I1_S15 = std::stoi(val);
-        else if (key == "I1_S16") cfg->PAE_I1_S16 = std::stoi(val);
-        else if (key == "I2_S21") cfg->PAE_I2_S21 = std::stoi(val);
-        else if (key == "I2_S22") cfg->PAE_I2_S22 = std::stoi(val);
-        else if (key == "I2_S23") cfg->PAE_I2_S23 = std::stoi(val);
-        else if (key == "I3_S31") cfg->PAE_I3_S31 = std::stoi(val);
-        else if (key == "I6_S61") cfg->PAE_I6_S61 = std::stod(val);
-        else if (key == "I6_S62") cfg->PAE_I6_S62 = std::stod(val);
-        else if (key == "I7_S71") cfg->PAE_I7_S71 = std::stod(val);
-        else if (key == "I7_S72") cfg->PAE_I7_S72 = std::stod(val);
-        else if (key == "I7_S73") cfg->PAE_I7_S73 = std::stod(val);
+        try {
+          if (key == "W1") cfg->PAE_W1 = std::stod(val);
+          else if (key == "W2") cfg->PAE_W2 = std::stod(val);
+          else if (key == "W3") cfg->PAE_W3 = std::stod(val);
+          else if (key == "W4") cfg->PAE_W4 = std::stod(val);
+          else if (key == "W5") cfg->PAE_W5 = std::stod(val);
+          else if (key == "W6") cfg->PAE_W6 = std::stod(val);
+          else if (key == "W7") cfg->PAE_W7 = std::stod(val);
+          else if (key == "N_TH") cfg->PAE_N_TH = std::stoi(val);
+          else if (key == "SEED") cfg->PAE_HASH_SEED = std::stoi(val);
+          else if (key == "I1_S11") cfg->PAE_I1_S11 = std::stoi(val);
+          else if (key == "I1_S12") cfg->PAE_I1_S12 = std::stoi(val);
+          else if (key == "I1_S13") cfg->PAE_I1_S13 = std::stoi(val);
+          else if (key == "I1_S14") cfg->PAE_I1_S14 = std::stoi(val);
+          else if (key == "I1_S15") cfg->PAE_I1_S15 = std::stoi(val);
+          else if (key == "I1_S16") cfg->PAE_I1_S16 = std::stoi(val);
+          else if (key == "I2_S21") cfg->PAE_I2_S21 = std::stoi(val);
+          else if (key == "I2_S22") cfg->PAE_I2_S22 = std::stoi(val);
+          else if (key == "I2_S23") cfg->PAE_I2_S23 = std::stoi(val);
+          else if (key == "I3_S31") cfg->PAE_I3_S31 = std::stoi(val);
+          else if (key == "I6_S61") cfg->PAE_I6_S61 = std::stod(val);
+          else if (key == "I6_S62") cfg->PAE_I6_S62 = std::stod(val);
+          else if (key == "I7_S71") cfg->PAE_I7_S71 = std::stod(val);
+          else if (key == "I7_S72") cfg->PAE_I7_S72 = std::stod(val);
+          else if (key == "I7_S73") cfg->PAE_I7_S73 = std::stod(val);
+        } catch (...) {
+           continue;
+        }
       }
       continue;
     }
@@ -706,47 +733,54 @@ bool PinAccessEvalMgr::importReport(const std::string& filename)
 
     std::stringstream ss(line);
     std::string val;
-    if (current_section == CELL) {
-      // Data: CELL NAME,FinalScore,UniqueClassNum,PatternNum
-      std::string master_name;
-      std::getline(ss, master_name, ','); 
-      std::getline(ss, val, ','); // FinalScore
-      hist_cell_db_[master_name] = std::stoi(val);
-    } else if (current_section == UCLASS) {
-      // Data: PAEUClassKey,Master,Orient,OffX,OffY,PatternNum,AvgPatternScore,I5,I6,FinalScore
-      std::vector<std::string> parts;
-      while (std::getline(ss, val, ',')) parts.push_back(val);
-      if (parts.size() >= 10) {
-        HistUCData data;
-        data.pattern_count = std::stoi(parts[5]);
-        data.i5 = std::stoi(parts[7]);
-        data.i6 = std::stoi(parts[8]);
-        data.final_score = std::stoi(parts[9]);
-        hist_uclass_db_[parts[0]] = data;
+    try {
+      if (current_section == CELL) {
+        // Data: CELL NAME,FinalScore,UniqueClassNum,PatternNum
+        std::string master_name;
+        if (!std::getline(ss, master_name, ',')) continue;
+        if (!std::getline(ss, val, ',')) continue; // FinalScore
+        hist_cell_db_[master_name] = std::stoi(val);
+      } else if (current_section == UCLASS) {
+        // Data: PAEUClassKey,Master,Orient,OffX,OffY,PatternNum,AvgPatternScore,I5,I6,FinalScore
+        std::vector<std::string> parts;
+        while (std::getline(ss, val, ',')) parts.push_back(val);
+        if (parts.size() >= 10) {
+          HistUCData data;
+          data.pattern_count = std::stoi(parts[5]);
+          data.i5 = std::stoi(parts[7]);
+          data.i6 = std::stoi(parts[8]);
+          data.final_score = std::stoi(parts[9]);
+          hist_uclass_db_[parts[0]] = data;
+        }
+      } else if (current_section == PATTERN) {
+        // Data: PAEPatternKey,UClassID,Master,I1,I2,I3,N_selected,N_ripup,S_static,S_dynamic,FinalScore
+        std::vector<std::string> parts;
+        while (std::getline(ss, val, ',')) parts.push_back(val);
+        if (parts.size() >= 11) {
+          HistPatternData data;
+          data.i1 = std::stoi(parts[3]);
+          data.i2 = std::stoi(parts[4]);
+          data.i3 = std::stoi(parts[5]);
+          data.n_selected = std::stoi(parts[6]);
+          data.n_ripup = std::stoi(parts[7]);
+          data.s_static = std::stoi(parts[8]);
+          data.s_dynamic = std::stoi(parts[9]);
+          data.s_final = std::stoi(parts[10]);
+          hist_pattern_db_[parts[0]] = data;
+        }
       }
-    } else if (current_section == PATTERN) {
-      // Data: PAEPatternKey,UClassID,Master,I1,I2,I3,N_selected,N_ripup,S_static,S_dynamic,FinalScore
-      std::vector<std::string> parts;
-      while (std::getline(ss, val, ',')) parts.push_back(val);
-      if (parts.size() >= 11) {
-        HistPatternData data;
-        data.i1 = std::stoi(parts[3]);
-        data.i2 = std::stoi(parts[4]);
-        data.i3 = std::stoi(parts[5]);
-        data.n_selected = std::stoi(parts[6]);
-        data.n_ripup = std::stoi(parts[7]);
-        data.s_static = std::stoi(parts[8]);
-        data.s_dynamic = std::stoi(parts[9]);
-        data.s_final = std::stoi(parts[10]);
-        hist_pattern_db_[parts[0]] = data;
-      }
+    } catch (...) {
+      continue;
     }
   }
+  logger_->info(utl::DRT, 1019, "Finished importing PAE report. {} patterns, {} unique classes, {} master cells imported.", hist_pattern_db_.size(), hist_uclass_db_.size(), hist_cell_db_.size());
+  report_imported_ = true;
   return true;
 }
 
 bool PinAccessEvalMgr::importParams(const std::string& filename)
 {
+  logger_->info(utl::DRT, 1020, "Importing PAE parameters from {}.", filename);
   try {
     YAML::Node config = YAML::LoadFile(filename);
     auto cfg = const_cast<RouterConfiguration*>(getRouterConfig());
@@ -779,6 +813,7 @@ bool PinAccessEvalMgr::importParams(const std::string& filename)
     if (config["PA_MIN_ON_GRID_CANDIDATES"]) cfg->PA_MIN_ON_GRID_CANDIDATES = config["PA_MIN_ON_GRID_CANDIDATES"].as<int>();
 
     params_imported_ = true;
+    logger_->info(utl::DRT, 1021, "Finished importing PAE parameters.");
     return true;
   } catch (const std::exception& e) {
     logger_->warn(utl::DRT, 1013, "Failed to load PAE parameters from {}: {}", filename, e.what());

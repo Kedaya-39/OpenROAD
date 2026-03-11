@@ -72,6 +72,8 @@ struct HistUCData
  */
 struct PAEPatternMetrics
 {
+  std::string PAEPatternKey;  // Cache for getPAEPatternKey
+
   // Static indicators (Stored as int: normalized * 1000)
   int i1{0};  // Track Alignment
   int i2{0};  // Access Directions
@@ -100,6 +102,7 @@ struct PAEPatternMetrics
  */
 struct PAEUClassMetrics
 {
+  std::string PAEUClassKey;  // Cache for getPAEUClassKey
   int i5{0};  // Access Pattern Capacity
   int i6{0};  // Access Pattern Diversity
   int final_score{0};
@@ -183,13 +186,13 @@ class PinAccessEvalMgr
    * @brief Generates a deterministic signature hash for a pattern.
    * ID format: P_{UClassID}_{SignatureHash}
    */
-  std::string getPAEPatternKey(UniqueClass* uclass, FlexPinAccessPattern* pattern) const;
+  std::string getPAEPatternKey(UniqueClass* uclass, FlexPinAccessPattern* pattern);
 
   /**
    * @brief Generates a unique ID for a placement scenario.
    * ID format: UC_{Master}_{Orient}_{OffX}_{OffY}
    */
-  std::string getPAEUClassKey(UniqueClass* uclass) const;
+  std::string getPAEUClassKey(UniqueClass* uclass);
 
  private:
   frDesign* design_;
@@ -198,6 +201,7 @@ class PinAccessEvalMgr
   utl::Logger* logger_;
 
   bool params_imported_{false};
+  bool report_imported_{false};
 
   // Active Database: Maps standard objects to their calculated metrics.
   // Using unique_ptr to handle non-copyable atomic members in metrics structs.
