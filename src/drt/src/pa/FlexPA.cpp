@@ -332,7 +332,7 @@ void FlexPA::prepPattern()
     logger_->info(DRT, 81, "  Complete {} unique inst patterns.", cnt);
   }
   
-  if (eval_mgr_) {
+  if (eval_mgr_ && router_cfg_->DO_PAE) {
     eval_mgr_->runStaticAnalysis();
   }
 

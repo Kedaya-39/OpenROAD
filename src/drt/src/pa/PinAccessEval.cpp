@@ -11,6 +11,7 @@
 #include <sstream>
 #include <set>
 
+#include "utl/timer.h"
 #include "db/obj/frInst.h"
 #include "db/obj/frMaster.h"
 #include "db/obj/frTerm.h"
@@ -103,7 +104,7 @@ std::string PinAccessEvalMgr::getPAEUClassKey(UniqueClass* uclass)
     }
     std::ostringstream oss;
     const auto& offsets = uclass->getOffsets();
-    oss << "UC_" << uclass->getMaster()->getName() << "_" << (int) uclass->getOrient()
+    oss << "UC_" << uclass->getMaster()->getName() << "_" << uclass->getOrient().getString()
         << "_" << (offsets.size() > 0 ? offsets[0] : 0) << "_"
         << (offsets.size() > 1 ? offsets[1] : 0);
     m->PAEUClassKey = oss.str();
@@ -185,7 +186,8 @@ void PinAccessEvalMgr::runStaticAnalysis()
     return;
   }
 
-  logger_->info(utl::DRT, 1014, "Starting Pin Access Static Analysis.");
+  logger_->info(utl::DRT, 1010, "PAE: Starting pin access static analysis.");
+  utl::Timer timer;
 
   auto& unique_classes = pa_->getUniqueInsts()->getUniqueClasses();
   for (auto& uc_ptr : unique_classes) {
@@ -204,6 +206,7 @@ void PinAccessEvalMgr::runStaticAnalysis()
     }
     updateUClassScoreFactor(uc);
   }
+  logger_->info(utl::DRT, 1011, "PAE: Finished pin access static analysis ({:.2f}s).", timer.elapsed());
 }
 
 void PinAccessEvalMgr::countPatternSelection(frInst* inst)
@@ -358,12 +361,16 @@ void PinAccessEvalMgr::runDynamicAnalysis()
   if (!cfg || !cfg->DO_PAE)
     return;
 
+  logger_->info(utl::DRT, 1020, "PAE: Starting pin access dynamic analysis.");
+  utl::Timer timer;
+
   for (auto const& [uc, patterns] : pa_->unique_inst_patterns_) {
     for (auto& p : patterns) {
       updatePatternDynamicScore(p.get());
     }
     updateUClassScore(uc);
   }
+  logger_->info(utl::DRT, 1021, "PAE: Finished pin access dynamic analysis ({:.2f}s).", timer.elapsed());
 }
 
 void PinAccessEvalMgr::updatePatternDynamicScore(FlexPinAccessPattern* pattern)
@@ -504,9 +511,11 @@ int PinAccessEvalMgr::getUClassScore(UniqueClass* uclass) const
 
 void PinAccessEvalMgr::report(const std::string& filename)
 {
+  logger_->info(utl::DRT, 1035, "PAE: Exporting PAE report to {}.", filename);
+  utl::Timer timer;
   std::ofstream out(filename);
   if (!out.is_open()) {
-    logger_->error(utl::DRT, 1015, "Failed to open PAE report for writing: {}", filename);
+    logger_->error(utl::DRT, 1037, "PAE: Failed to open PAE report for writing: {}", filename);
     return;
   }
 
@@ -535,7 +544,7 @@ void PinAccessEvalMgr::report(const std::string& filename)
   
   // CELL SCORE
   out << "### CELL SCORE:\n";
-  out << "CELL NAME,FinalScore,UniqueClassNum,PatternNum\n";
+  out << "CellName,FinalScore,UniqueClassNum,PatternNum\n";
   std::map<frMaster*, std::vector<UniqueClass*>> cell_to_uclasses;
   for (auto const& [uc, metrics] : uclass_metrics_db_) {
     cell_to_uclasses[uc->getMaster()].push_back(uc);
@@ -567,7 +576,7 @@ void PinAccessEvalMgr::report(const std::string& filename)
       }
       avg_pat_score /= pat_num;
     }
-    out << getPAEUClassKey(uc) << "," << uc->getMaster()->getName() << "," << (int)uc->getOrient() << ","
+    out << getPAEUClassKey(uc) << "," << uc->getMaster()->getName() << "," << uc->getOrient().getString() << ","
         << (uc->getOffsets().size() > 0 ? uc->getOffsets()[0] : 0) << ","
         << (uc->getOffsets().size() > 1 ? uc->getOffsets()[1] : 0) << ","
         << pat_num << "," << (int)avg_pat_score << "," << metrics->i5 << "," << metrics->i6 << "," 
@@ -594,9 +603,11 @@ void PinAccessEvalMgr::report(const std::string& filename)
   // 7.3.4 Pattern Detail (Access Points)
   out << "### PATTERN DETAIL (ACCESS POINTS):\n";
   out << "PatternID,AP_Index,X,Y,Layer,E,S,W,N,U,D\n";
+  int pattern_count = 0;
   for (auto const& [uc, metrics] : uclass_metrics_db_) {
     auto it = pa_->unique_inst_patterns_.find(uc);
     if (it != pa_->unique_inst_patterns_.end()) {
+      pattern_count += it->second.size();
       for (auto& p : it->second) {
         std::string pat_id = getPAEPatternKey(uc, p.get());
         const auto& aps = p->getPattern();
@@ -613,14 +624,16 @@ void PinAccessEvalMgr::report(const std::string& filename)
       }
     }
   }
+  logger_->info(utl::DRT, 1036, "PAE: Finished exporting PAE report ({:.2f}s). {} master cells, {} unique classes, {} patterns exported.", timer.elapsed(), (int)cell_to_uclasses.size(), (int)uclass_metrics_db_.size(), pattern_count);
 }
 
 bool PinAccessEvalMgr::importReport(const std::string& filename)
 {
-  logger_->info(utl::DRT, 1018, "Importing PAE report from {}.", filename);
+  logger_->info(utl::DRT, 1030, "PAE: Importing PAE report from {}.", filename);
+  utl::Timer timer;
   std::ifstream in(filename);
   if (!in.is_open()) {
-    logger_->warn(utl::DRT, 1012, "Failed to open PAE report for reading: {}", filename);
+    logger_->warn(utl::DRT, 1032, "PAE: Failed to open PAE report for reading: {}", filename);
     return false;
   }
 
@@ -669,7 +682,7 @@ bool PinAccessEvalMgr::importReport(const std::string& filename)
       std::getline(tech_ss, hist_grid_str, ',');
       
       if (hist_name.empty() || hist_dbu_str.empty() || hist_grid_str.empty()) {
-        logger_->warn(utl::DRT, 1016, "Malformed PAETechKey line, skipping import.");
+        logger_->warn(utl::DRT, 1033, "PAE: Malformed PAETechKey line, skipping import.");
         return false;
       }
 
@@ -680,7 +693,7 @@ bool PinAccessEvalMgr::importReport(const std::string& filename)
 
       auto current_tech = getPAETechKey();
       if (!(hist_tech == current_tech)) {
-        logger_->warn(utl::DRT, 1017, "PAE Tech mismatch, skipping import. Design: {}, Report: {}", current_tech.tech_name, hist_tech.tech_name);
+        logger_->warn(utl::DRT, 1034, "PAE: PAE Tech mismatch, skipping import. Design: {}, Report: {}", current_tech.tech_name, hist_tech.tech_name);
         return false;
       }
       continue;
@@ -773,14 +786,14 @@ bool PinAccessEvalMgr::importReport(const std::string& filename)
       continue;
     }
   }
-  logger_->info(utl::DRT, 1019, "Finished importing PAE report. {} patterns, {} unique classes, {} master cells imported.", hist_pattern_db_.size(), hist_uclass_db_.size(), hist_cell_db_.size());
+  logger_->info(utl::DRT, 1031, "PAE: Finished importing PAE report ({:.2f}s). {} patterns, {} unique classes, {} master cells imported.", timer.elapsed(), hist_pattern_db_.size(), hist_uclass_db_.size(), hist_cell_db_.size());
   report_imported_ = true;
   return true;
 }
 
 bool PinAccessEvalMgr::importParams(const std::string& filename)
 {
-  logger_->info(utl::DRT, 1020, "Importing PAE parameters from {}.", filename);
+  logger_->info(utl::DRT, 1040, "PAE: Importing PAE parameters from {}.", filename);
   try {
     YAML::Node config = YAML::LoadFile(filename);
     auto cfg = const_cast<RouterConfiguration*>(getRouterConfig());
@@ -813,10 +826,10 @@ bool PinAccessEvalMgr::importParams(const std::string& filename)
     if (config["PA_MIN_ON_GRID_CANDIDATES"]) cfg->PA_MIN_ON_GRID_CANDIDATES = config["PA_MIN_ON_GRID_CANDIDATES"].as<int>();
 
     params_imported_ = true;
-    logger_->info(utl::DRT, 1021, "Finished importing PAE parameters.");
+    logger_->info(utl::DRT, 1041, "PAE: Finished importing PAE parameters.");
     return true;
   } catch (const std::exception& e) {
-    logger_->warn(utl::DRT, 1013, "Failed to load PAE parameters from {}: {}", filename, e.what());
+    logger_->warn(utl::DRT, 1042, "PAE: Failed to load PAE parameters from {}: {}", filename, e.what());
     return false;
   }
 }
