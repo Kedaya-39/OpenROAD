@@ -186,7 +186,7 @@ void PinAccessEvalMgr::runStaticAnalysis()
     return;
   }
 
-  logger_->info(utl::DRT, 1010, "PAE: Starting pin access static analysis.");
+  logger_->info(utl::DRT, 1012, "PAE: Starting pin access static analysis.");
   utl::Timer timer;
 
   auto& unique_classes = pa_->getUniqueInsts()->getUniqueClasses();
@@ -206,7 +206,7 @@ void PinAccessEvalMgr::runStaticAnalysis()
     }
     updateUClassScoreFactor(uc);
   }
-  logger_->info(utl::DRT, 1011, "PAE: Finished pin access static analysis ({:.2f}s).", timer.elapsed());
+  logger_->info(utl::DRT, 1013, "PAE: Finished pin access static analysis ({:.2f}s).", timer.elapsed());
 }
 
 void PinAccessEvalMgr::countPatternSelection(frInst* inst)
