@@ -1927,7 +1927,7 @@ void FlexDRWorker::route_queue_main(std::queue<RouteQueueEntry>& rerouteQueue)
       }
       net->clear();
 
-      // DTCO Pin Access Evaluation: Record Rip-up (I10)
+      // DTCO Pin Access Evaluation: Record Rip-up (I7)
       if (eval_mgr_  && router_cfg_->DO_PAE && numReroute > 0) {
         for (auto& pin : net->getPins()) {
           if (pin->isInstPin()) {

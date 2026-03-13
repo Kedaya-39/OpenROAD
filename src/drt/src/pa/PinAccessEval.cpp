@@ -221,6 +221,54 @@ void PinAccessEvalMgr::countPatternRipup(frInst* inst)
   if (auto m = ensurePatternMetrics(inst)) {
     m->n_ripup++;
   }
+
+  const auto* cfg = getRouterConfig();
+  if (!cfg || cfg->PAE_I7_S74 <= 0) {
+    return;
+  }
+
+  std::vector<PAEPatternMetrics*> neighbors;
+  bool found_in_cache = false;
+  auto it = inst_neighbor_metrics_cache_.find(inst);
+  if (it != inst_neighbor_metrics_cache_.end()) {
+    neighbors = it->second;
+    found_in_cache = true;
+  }
+
+  if (!found_in_cache) {
+    odb::Rect instBox = inst->getBBox();
+    int h_bloat = (int)(cfg->PAE_I7_S76 * instBox.dx());
+    int v_bloat = (int)(cfg->PAE_I7_S75 * instBox.dy());
+    
+    if (h_bloat > 0 || v_bloat > 0) {
+      odb::Rect queryBox = instBox;
+      queryBox.bloat(h_bloat, v_bloat);
+      frRegionQuery::Objects<frBlockObject> query_result;
+      design_->getRegionQuery()->query(queryBox, design_->getTech()->getBottomLayerNum(), query_result);
+      
+      std::set<frInst*> unique_neighbors;
+      for (auto& [box, obj] : query_result) {
+        if (obj->typeId() == frcInstTerm) {
+          frInst* nb_inst = static_cast<frInstTerm*>(obj)->getInst();
+          if (nb_inst != inst) {
+            unique_neighbors.insert(nb_inst);
+          }
+        }
+      }
+      
+      for (auto nb_inst : unique_neighbors) {
+        if (auto m_nb = ensurePatternMetrics(nb_inst)) {
+          neighbors.push_back(m_nb);
+        }
+      }
+    }
+    
+    inst_neighbor_metrics_cache_[inst] = neighbors;
+  }
+
+  for (auto m_nb : neighbors) {
+    m_nb->n_nbRipup++;
+  }
 }
 
 void PinAccessEvalMgr::updatePatternScoreFactor(UniqueClass* uclass,
@@ -241,6 +289,7 @@ void PinAccessEvalMgr::updatePatternScoreFactor(UniqueClass* uclass,
       metrics->i4 = hist.i4;
       metrics->n_selected.store(hist.n_selected);
       metrics->n_ripup.store(hist.n_ripup);
+      metrics->n_nbRipup.store(hist.n_nbRipup);
       return;
     }
   }
@@ -379,7 +428,8 @@ void PinAccessEvalMgr::updatePatternDynamicScore(FlexPinAccessPattern* pattern)
   auto m = ensurePatternMetrics(pattern);
 
   double raw_i7 = cfg->PAE_I7_S71 * m->n_ripup.load()
-                  - cfg->PAE_I7_S72 * m->n_selected.load();
+                  - cfg->PAE_I7_S72 * m->n_selected.load()
+                  + cfg->PAE_I7_S74 * m->n_nbRipup.load();
   // i7 Normalization: Sigmoid
   double norm_i7 = 1.0 / (1.0 + std::exp(cfg->PAE_I7_S73 * raw_i7));
   m->i7 = (int)(norm_i7 * 1000.0);
@@ -538,7 +588,8 @@ void PinAccessEvalMgr::report(const std::string& filename)
       << ",I1_S16=" << cfg->PAE_I1_S16 << ",I2_S21=" << cfg->PAE_I2_S21 << ",I2_S22=" << cfg->PAE_I2_S22 
       << ",I2_S23=" << cfg->PAE_I2_S23 << ",I3_S31=" << cfg->PAE_I3_S31 << ",I6_S61=" << cfg->PAE_I6_S61 
       << ",I6_S62=" << cfg->PAE_I6_S62 << ",I7_S71=" << cfg->PAE_I7_S71 << ",I7_S72=" << cfg->PAE_I7_S72 
-      << ",I7_S73=" << cfg->PAE_I7_S73 << "\n";
+      << ",I7_S73=" << cfg->PAE_I7_S73 << ",I7_S74=" << cfg->PAE_I7_S74 << ",I7_S75=" << cfg->PAE_I7_S75
+      << ",I7_S76=" << cfg->PAE_I7_S76 << "\n";
 
   // 7.3.3 Hierarchical Score Data
   
@@ -585,7 +636,7 @@ void PinAccessEvalMgr::report(const std::string& filename)
 
   // ACCESS PATTERN SCORE
   out << "### ACCESS PATTERN SCORE:\n";
-  out << "PAEPatternKey,UClassID,Master,I1,I2,I3,N_selected,N_ripup,S_static,S_dynamic,FinalScore\n";
+  out << "PAEPatternKey,UClassID,Master,I1,I2,I3,N_selected,N_ripup,N_nbRipup,S_static,S_dynamic,FinalScore\n";
   for (auto const& [uc, metrics] : uclass_metrics_db_) {
     std::string uc_id = getPAEUClassKey(uc);
     auto it = pa_->unique_inst_patterns_.find(uc);
@@ -594,7 +645,7 @@ void PinAccessEvalMgr::report(const std::string& filename)
         auto pm = ensurePatternMetrics(p.get());
         out << getPAEPatternKey(uc, p.get()) << "," << uc_id << "," << uc->getMaster()->getName() << ","
             << pm->i1 << "," << pm->i2 << "," << pm->i3 << "," 
-            << pm->n_selected.load() << "," << pm->n_ripup.load() << ","
+            << pm->n_selected.load() << "," << pm->n_ripup.load() << "," << pm->n_nbRipup.load() << ","
             << pm->static_score << "," << pm->dynamic_score << "," << pm->final_score << "\n";
       }
     }
@@ -733,6 +784,9 @@ bool PinAccessEvalMgr::importReport(const std::string& filename)
           else if (key == "I7_S71") cfg->PAE_I7_S71 = std::stod(val);
           else if (key == "I7_S72") cfg->PAE_I7_S72 = std::stod(val);
           else if (key == "I7_S73") cfg->PAE_I7_S73 = std::stod(val);
+          else if (key == "I7_S74") cfg->PAE_I7_S74 = std::stod(val);
+          else if (key == "I7_S75") cfg->PAE_I7_S75 = std::stod(val);
+          else if (key == "I7_S76") cfg->PAE_I7_S76 = std::stod(val);
         } catch (...) {
            continue;
         }
@@ -766,19 +820,20 @@ bool PinAccessEvalMgr::importReport(const std::string& filename)
           hist_uclass_db_[parts[0]] = data;
         }
       } else if (current_section == PATTERN) {
-        // Data: PAEPatternKey,UClassID,Master,I1,I2,I3,N_selected,N_ripup,S_static,S_dynamic,FinalScore
+        // Data: PAEPatternKey,UClassID,Master,I1,I2,I3,N_selected,N_ripup,N_nbRipup,S_static,S_dynamic,FinalScore
         std::vector<std::string> parts;
         while (std::getline(ss, val, ',')) parts.push_back(val);
-        if (parts.size() >= 11) {
+        if (parts.size() >= 12) {
           HistPatternData data;
           data.i1 = std::stoi(parts[3]);
           data.i2 = std::stoi(parts[4]);
           data.i3 = std::stoi(parts[5]);
           data.n_selected = std::stoi(parts[6]);
           data.n_ripup = std::stoi(parts[7]);
-          data.s_static = std::stoi(parts[8]);
-          data.s_dynamic = std::stoi(parts[9]);
-          data.s_final = std::stoi(parts[10]);
+          data.n_nbRipup = std::stoi(parts[8]);
+          data.s_static = std::stoi(parts[9]);
+          data.s_dynamic = std::stoi(parts[10]);
+          data.s_final = std::stoi(parts[11]);
           hist_pattern_db_[parts[0]] = data;
         }
       }
@@ -823,6 +878,9 @@ bool PinAccessEvalMgr::importParams(const std::string& filename)
     if (config["PAE_I7_S71"]) cfg->PAE_I7_S71 = config["PAE_I7_S71"].as<double>();
     if (config["PAE_I7_S72"]) cfg->PAE_I7_S72 = config["PAE_I7_S72"].as<double>();
     if (config["PAE_I7_S73"]) cfg->PAE_I7_S73 = config["PAE_I7_S73"].as<double>();
+    if (config["PAE_I7_S74"]) cfg->PAE_I7_S74 = config["PAE_I7_S74"].as<double>();
+    if (config["PAE_I7_S75"]) cfg->PAE_I7_S75 = config["PAE_I7_S75"].as<double>();
+    if (config["PAE_I7_S76"]) cfg->PAE_I7_S76 = config["PAE_I7_S76"].as<double>();
     if (config["PA_MIN_ON_GRID_CANDIDATES"]) cfg->PA_MIN_ON_GRID_CANDIDATES = config["PA_MIN_ON_GRID_CANDIDATES"].as<int>();
 
     params_imported_ = true;

@@ -93,6 +93,9 @@ struct RouterConfiguration
   double PAE_I7_S71 = 1.5;     // Rip-up penalty factor
   double PAE_I7_S72 = 1.0;     // Selection bonus factor
   double PAE_I7_S73 = -0.001;  // Sigmoid slope
+  double PAE_I7_S74 = 0.5;     // Neighbor rip-up penalty factor
+  double PAE_I7_S75 = 2;       // Neighbor search window height expansion multiplier
+  double PAE_I7_S76 = 1;       // Neighbor search window width expansion multiplier
 
   std::string VIAINPIN_BOTTOMLAYER_NAME;
   std::string VIAINPIN_TOPLAYER_NAME;

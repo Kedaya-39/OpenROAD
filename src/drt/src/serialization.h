@@ -794,6 +794,9 @@ void serializeGlobals(Archive& ar, RouterConfiguration* router_cfg)
   (ar) & router_cfg->PAE_I7_S71;
   (ar) & router_cfg->PAE_I7_S72;
   (ar) & router_cfg->PAE_I7_S73;
+  (ar) & router_cfg->PAE_I7_S74;
+  (ar) & router_cfg->PAE_I7_S75;
+  (ar) & router_cfg->PAE_I7_S76;
   (ar) & router_cfg->PA_MIN_ON_GRID_CANDIDATES;
   (ar) & router_cfg->VIAINPIN_BOTTOMLAYER_NAME;
   (ar) & router_cfg->VIAINPIN_TOPLAYER_NAME;

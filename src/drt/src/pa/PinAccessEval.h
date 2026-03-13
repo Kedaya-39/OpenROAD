@@ -51,7 +51,7 @@ struct PAETechKey
 struct HistPatternData
 {
   int i1, i2, i3, i4, i7;
-  int n_selected, n_ripup;
+  int n_selected, n_ripup, n_nbRipup;
   int s_static, s_dynamic, s_final;
 };
 
@@ -83,6 +83,7 @@ struct PAEPatternMetrics
   // Dynamic metrics
   std::atomic<int> n_ripup{0};
   std::atomic<int> n_selected{0};
+  std::atomic<int> n_nbRipup{0};
   int i7{0};  // Rip-up Frequency (Dynamic penalty)
 
   int static_score{0};
@@ -209,6 +210,9 @@ class PinAccessEvalMgr
       pattern_metrics_db_;
   std::unordered_map<UniqueClass*, std::unique_ptr<PAEUClassMetrics>>
       uclass_metrics_db_;
+
+  // Cache for neighbor metrics to accelerate dynamic monitoring
+  std::unordered_map<frInst*, std::vector<PAEPatternMetrics*>> inst_neighbor_metrics_cache_;
 
   // Historical Database: Maps string IDs from reports to historical data.
   std::unordered_map<std::string, int> hist_cell_db_;
