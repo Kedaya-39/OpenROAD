@@ -7,6 +7,7 @@
 #include <cmath>
 #include <fstream>
 #include <iomanip>
+#include <mutex>
 #include <numeric>
 #include <sstream>
 #include <set>
@@ -229,41 +230,59 @@ void PinAccessEvalMgr::countPatternRipup(frInst* inst)
 
   std::vector<PAEPatternMetrics*> neighbors;
   bool found_in_cache = false;
-  auto it = inst_neighbor_metrics_cache_.find(inst);
-  if (it != inst_neighbor_metrics_cache_.end()) {
-    neighbors = it->second;
-    found_in_cache = true;
+  {
+    std::lock_guard<std::mutex> lock(cache_mutex_);
+    auto it = inst_neighbor_metrics_cache_.find(inst);
+    if (it != inst_neighbor_metrics_cache_.end()) {
+      neighbors = it->second;
+      found_in_cache = true;
+    }
   }
 
   if (!found_in_cache) {
     odb::Rect instBox = inst->getBBox();
-    int h_bloat = (int)(cfg->PAE_I7_S76 * instBox.dx());
-    int v_bloat = (int)(cfg->PAE_I7_S75 * instBox.dy());
-    
+    int h_bloat = (int) (cfg->PAE_I7_S76 * instBox.dx());
+    int v_bloat = (int) (cfg->PAE_I7_S75 * instBox.dy());
+
     if (h_bloat > 0 || v_bloat > 0) {
-      odb::Rect queryBox(instBox.xMin() - h_bloat, instBox.yMin() - v_bloat,
-                         instBox.xMax() + h_bloat, instBox.yMax() + v_bloat);
-      frRegionQuery::Objects<frBlockObject> query_result;
-      design_->getRegionQuery()->query(queryBox, design_->getTech()->getBottomLayerNum(), query_result);
-      
+      odb::Rect queryBox(instBox.xMin() - h_bloat,
+                         instBox.yMin() - v_bloat,
+                         instBox.xMax() + h_bloat,
+                         instBox.yMax() + v_bloat);
       std::set<frInst*> unique_neighbors;
-      for (auto& [box, obj] : query_result) {
-        if (obj->typeId() == frcInstTerm) {
-          frInst* nb_inst = static_cast<frInstTerm*>(obj)->getInst();
-          if (nb_inst != inst) {
-            unique_neighbors.insert(nb_inst);
+      for (int i = design_->getTech()->getBottomLayerNum();
+           i <= design_->getTech()->getTopLayerNum();
+           i++) {
+        if (i > cfg->TOP_ROUTING_LAYER) {
+          break;
+        }
+        if (design_->getTech()->getLayer(i)->getType()
+            != odb::dbTechLayerType::ROUTING) {
+          continue;
+        }
+        frRegionQuery::Objects<frBlockObject> query_result;
+        design_->getRegionQuery()->query(queryBox, i, query_result);
+
+        for (auto& [box, obj] : query_result) {
+          if (obj->typeId() == frcInstTerm) {
+            frInst* nb_inst = static_cast<frInstTerm*>(obj)->getInst();
+            if (nb_inst != inst) {
+              unique_neighbors.insert(nb_inst);
+            }
           }
         }
       }
-      
+
       for (auto nb_inst : unique_neighbors) {
         if (auto m_nb = ensurePatternMetrics(nb_inst)) {
           neighbors.push_back(m_nb);
         }
       }
     }
-    
-    inst_neighbor_metrics_cache_[inst] = neighbors;
+    {
+      std::lock_guard<std::mutex> lock(cache_mutex_);
+      inst_neighbor_metrics_cache_[inst] = neighbors;
+    }
   }
 
   for (auto m_nb : neighbors) {

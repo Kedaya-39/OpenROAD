@@ -213,6 +213,7 @@ class PinAccessEvalMgr
 
   // Cache for neighbor metrics to accelerate dynamic monitoring
   std::unordered_map<frInst*, std::vector<PAEPatternMetrics*>> inst_neighbor_metrics_cache_;
+  mutable std::mutex cache_mutex_;
 
   // Historical Database: Maps string IDs from reports to historical data.
   std::unordered_map<std::string, int> hist_cell_db_;
