@@ -241,8 +241,8 @@ void PinAccessEvalMgr::countPatternRipup(frInst* inst)
     int v_bloat = (int)(cfg->PAE_I7_S75 * instBox.dy());
     
     if (h_bloat > 0 || v_bloat > 0) {
-      odb::Rect queryBox = instBox;
-      queryBox.bloat(h_bloat, v_bloat);
+      odb::Rect queryBox(instBox.xMin() - h_bloat, instBox.yMin() - v_bloat,
+                         instBox.xMax() + h_bloat, instBox.yMax() + v_bloat);
       frRegionQuery::Objects<frBlockObject> query_result;
       design_->getRegionQuery()->query(queryBox, design_->getTech()->getBottomLayerNum(), query_result);
       
