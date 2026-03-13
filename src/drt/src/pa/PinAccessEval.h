@@ -225,7 +225,7 @@ class PinAccessEvalMgr
                                 FlexPinAccessPattern* pattern,
                                 PAEPatternMetrics* metrics);
   void updatePatternStaticScore(UniqueClass* uclass, FlexPinAccessPattern* pattern);
-  void updatePatternDynamicScore(FlexPinAccessPattern* pattern);
+  void updatePatternDynamicScore(PAEPatternMetrics* m);
   void updateUClassScoreFactor(UniqueClass* uclass);
   void updateUClassScore(UniqueClass* uclass);
 

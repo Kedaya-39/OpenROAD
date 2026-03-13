@@ -387,6 +387,7 @@ void PinAccessEvalMgr::updatePatternStaticScore(UniqueClass* uclass, FlexPinAcce
   // Calculate Weighted Static Score
   m->static_score = (int)(cfg->PAE_W1 * m->i1 + cfg->PAE_W2 * m->i2
                           + cfg->PAE_W3 * m->i3 + cfg->PAE_W4 * m->i4);
+  updatePatternDynamicScore(m);
   m->final_score = m->static_score + m->dynamic_score;
 }
 
@@ -434,17 +435,17 @@ void PinAccessEvalMgr::runDynamicAnalysis()
 
   for (auto const& [uc, patterns] : pa_->unique_inst_patterns_) {
     for (auto& p : patterns) {
-      updatePatternDynamicScore(p.get());
+      auto metrics = ensurePatternMetrics(p.get());
+      updatePatternDynamicScore(metrics);
     }
     updateUClassScore(uc);
   }
   logger_->info(utl::DRT, 1021, "PAE: Finished pin access dynamic analysis ({:.2f}s).", timer.elapsed());
 }
 
-void PinAccessEvalMgr::updatePatternDynamicScore(FlexPinAccessPattern* pattern)
+void PinAccessEvalMgr::updatePatternDynamicScore(PAEPatternMetrics* m)
 {
   const auto* cfg = getRouterConfig();
-  auto m = ensurePatternMetrics(pattern);
 
   double raw_i7 = cfg->PAE_I7_S71 * m->n_ripup.load()
                   - cfg->PAE_I7_S72 * m->n_selected.load()

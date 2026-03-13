@@ -716,7 +716,7 @@ void TritonRoute::stepDR(int size,
 }
 void TritonRoute::endFR()
 {
-  if (pin_access_eval_mgr_) {
+  if (pin_access_eval_mgr_ && router_cfg_->DO_PAE) {
     pin_access_eval_mgr_->runDynamicAnalysis();
   }
   if (router_cfg_->SINGLE_STEP_DR) {
