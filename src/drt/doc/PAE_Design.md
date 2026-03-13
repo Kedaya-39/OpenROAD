@@ -36,7 +36,7 @@ The `detailed_route` command is extended to support PAE operations through the f
     - Automatically enables `-do_pae`.
     - Loads specific PAE scoring parameters from the specified configuration file. includes:
       - weights: $PAE_W1$ to $PAE_W7$
-      - constants: $PAE_I1_S11$ to $PAE_I7_S73$
+      - constants: $PAE_I1_S11$ to $PAE_I7_S76$
       - threshold: $PAE_N_TH$, $PA_MIN_ON_GRID_CANDIDATES$
       - seed: $PAE_HASH_SEED$
 
@@ -121,11 +121,12 @@ $S_{pattern}^{static} = \sum_{k=1}^4 w_k \cdot Norm_k(I_k)$.
 The dynamic score is calculated as: $S_{pattern}^{dynamic} = w_7 \cdot Norm_7(I_7)$.
 
 **Indicator $I_7$ - Rip-up Frequency (拆线重布触发次数)**
-- **Definition**: Records the penalty intensity related to rip-ups during the routing stage.
-- **Calculation**: $I_7 = s_{71} \cdot N_{ripup} - s_{72} \cdot N_{selected}$
+- **Definition**: Records the penalty intensity related to rip-ups during the routing stage, considering both the pattern's own performance and its impact on the local neighborhood.
+- **Calculation**: $I_7 = s_{71} \cdot N_{ripup} - s_{72} \cdot N_{selected} + s_{74} \cdot N_{nbRipup}$
   - $N_{ripup}$: Number of times nets connected to this pattern were ripped up.
   - $N_{selected}$: Number of times this pattern was chosen.
-  - Constants: $s_{71} = 1.5, s_{72} = 1.0$.
+  - $N_{nbRipup}$: Neighbor Rip-up count. Number of times instances located within an expanded search window were ripped up. The search window is the current instance's BBox expanded by $s_{76} \times \text{width}$ on both left and right sides, and $s_{75} \times \text{height}$ on both top and bottom sides.
+  - Constants: $s_{71} = 1.5, $s_{72} = 1.0, $s_{74} = 0.5$. Expansion multipliers: $s_{75} = 2$ (Height multiplier), $s_{76} = 1$ (Width multiplier). For example, $s_{75}=2, s_{76}=1$ results in a search box 5x the instance height and 3x the instance width.
 - **Normalization**: $Norm_7(I_7) = 1 / (1 + \exp(s_{73} \cdot I_7))$ ($s_{73} = -0.001$).
 - **Rationale**: Uses a Sigmoid function to map the unbounded $I_7$ to $(0, 1)$. $I_7 = 0$ results in 0.5; positive values (poor performance) approach 1; negative values (good performance) approach 0.
 
@@ -203,7 +204,7 @@ Matching is performed using the following ID and data structure:
 | :--- | :--- | :--- |
 | **Cell** | `MasterName` | `Uniqule Class Num`, `Pattern Num`, `FinalScore` |
 | **Unique Class** | `PAEUClassKey` | `Master`, `Orient`, `OffX`, `OffY`, `Pattern Num`, `Pattern Avg. Score`, `I5`, `I6`, `FinalScore` |
-| **Access Pattern** | `PAEPatternKey` | `PAEUClassKey`, `Master`, `I1`, `I2`, `I3`, `N_selected`, `N_ripup`, `S_static`, `S_dynamic`, `S_final` |
+| **Access Pattern** | `PAEPatternKey` | `PAEUClassKey`, `Master`, `I1`, `I2`, `I3`, `N_selected`, `N_ripup`, `N_nbRipup`, `S_static`, `S_dynamic`, `S_final` |
 
 **ID Implementation Details**:
 - **Unique Class ID(PAEUClassKey)**: Combines the Master name, orientation string (e.g., R0, MX), and track offsets (in DBU) to uniquely identify a placement scenario.
@@ -231,7 +232,7 @@ When a historical match is found during the current flow:
     - If the current unique class has the same `PatternCount` as the history: $I_5 = I_{5\_hist}$ and $I_6 = I_{6\_hist}$. These metrics describe the pattern set diversity, which is fixed for a given techlib.
 3.  **Flow Timing**:
     - **Step 1**: During `FlexPA` static analysis (after all patterns are generated for a Unique Class), query history for each pattern and UC.
-    - **Step 2**: Import $I_7$ counts ($N_{ripup}, N_{selected}$) into the active metrics database **before** the `countPatternSelection` call (which occurs during row-based pattern assignment).
+    - **Step 2**: Import $I_7$ counts ($N_{ripup}, N_{selected}, N_{nbRipup}$) into the active metrics database **before** the `countPatternSelection` call (which occurs during row-based pattern assignment).
     - **Step 3**: The dynamic scoring logic will naturally incorporate these "warm" initial values.
 
 
