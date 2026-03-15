@@ -5,6 +5,11 @@
 2. The tao of PAO: anatomy of a pin access oracle for detailed routing,
 3. FastPass: A Fast Pin Access Analysis Framework for Detailed Routability Enhancement
 
+ISPD19的信息：
+1. 共10个测试。除了4和5使用65nm工艺，其他都使用32nm工艺。
+
+pae测试用的脚本在目录 pae_test/ 之下。
+
 本课题的详细技术细节为：
 
 相关概念:
