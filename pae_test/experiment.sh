@@ -1,6 +1,6 @@
 #!/bin/bash
-# experiment_mgr.sh - Master script for PAE experiments
-# Usage: ./experiment_mgr.sh <bin_path> <benchmark_root> <cases_file> <rounds>
+# experiment.sh - Master script for PAE experiments
+# Usage: ./experiment.sh <bin_path> <benchmark_root> <cases_file> <rounds>
 
 set -e
 
@@ -11,7 +11,7 @@ fi
 
 BIN_PATH=$(realpath -s "$1")
 BENCH_ROOT=$(realpath -s "$2")
-CASES_FILE="$3"
+CASES_FILE=$(realpath -s "$3")
 ROUNDS=$4
 
 SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
@@ -25,16 +25,25 @@ if [[ -z "$TRAIN_CASES" ]]; then
     exit 1
 fi
 
-# Cumulative report path (persistent across rounds)
-CUMULATIVE_REPORT="$(pwd)/cumulative_pae.report"
-# Clean start
-rm -f "$CUMULATIVE_REPORT"
+# 1. Create a unique root directory for this experiment run
+EXP_TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+EXP_ROOT_DIR="$(pwd)/pae_run_${EXP_TIMESTAMP}"
+mkdir -p "$EXP_ROOT_DIR"
 
 echo "=== PAE Experiment Started ==="
-echo "Train Cases: $TRAIN_CASES"
-echo "Val Cases:   $VAL_CASES"
-echo "Rounds:      $ROUNDS"
+echo "Experiment Root: $EXP_ROOT_DIR"
+echo "Train Cases:     $TRAIN_CASES"
+echo "Val Cases:       $VAL_CASES"
+echo "Rounds:          $ROUNDS"
 echo "------------------------------"
+
+# Move into the root directory so all outputs are contained
+cd "$EXP_ROOT_DIR"
+
+# 2. Cumulative report path (within the experiment root)
+CUMULATIVE_REPORT="${EXP_ROOT_DIR}/cumulative_pae.report"
+# Clean start
+rm -f "$CUMULATIVE_REPORT"
 
 for (( r=1; r<=ROUNDS; r++ )); do
     echo "[Round $r] Starting Training Phase..."
