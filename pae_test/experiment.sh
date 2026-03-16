@@ -68,7 +68,6 @@ for (( r=1; r<=ROUNDS; r++ )); do
         echo "[Round $r] Starting Training Phase..."
         for case_name in $TRAIN_CASES; do
             echo "[Round $r][Train] Running $case_name..."
-            real_case_name="ispd19_${case_name}"
             
             export PAE_DO_PAE=1
             export PAE_DO_PAE_ENHANCE=1
@@ -76,17 +75,17 @@ for (( r=1; r<=ROUNDS; r++ )); do
             export PAE_REPORT=$([[ -f "$CUMULATIVE_REPORT" ]] && echo "$CUMULATIVE_REPORT" || echo "")
             
             JOB_ID="R${r}_TR_${case_name}"
-            bash "${SCRIPT_DIR}/submit_job.sh" "$JOB_ID" "$BIN_PATH" "${BENCH_ROOT}/${real_case_name}" "${SCRIPT_DIR}/pae_dr.tcl"
+            bash "${SCRIPT_DIR}/submit_job.sh" "$JOB_ID" "$BIN_PATH" "${BENCH_ROOT}/${case_name}" "${SCRIPT_DIR}/pae_dr.tcl"
             
         # Capture the output report from the unique job directory safely
             LATEST_DIR=$(ls -td ord_pae_${JOB_ID}_* 2>/dev/null | head -1)
             if [[ -n "$LATEST_DIR" ]]; then
                 # 1. Update cumulative report
-                NEW_REPORT="${LATEST_DIR}/${real_case_name}/PAE.report"
+                NEW_REPORT="${LATEST_DIR}/${case_name}/PAE.report"
                 [[ -f "$NEW_REPORT" ]] && cp "$NEW_REPORT" "$CUMULATIVE_REPORT"
                 
                 # 2. Collect metrics
-                python3 "$COLLECT_SCRIPT" "$r" "Train" "$real_case_name" "${LATEST_DIR}/${real_case_name}" "$SUMMARY_CSV"
+                python3 "$COLLECT_SCRIPT" "$r" "Train" "$case_name" "${LATEST_DIR}/${case_name}" "$SUMMARY_CSV"
             fi
         done
     fi
@@ -94,29 +93,26 @@ for (( r=1; r<=ROUNDS; r++ )); do
     # --- Validation Phase ---
     if [[ -n "$VAL_CASES" ]]; then
         echo "[Round $r] Starting Validation Phase..."
-        VAL_JOB_IDS=""
         for case_name in $VAL_CASES; do
-            real_case_name="ispd19_${case_name}"
             export PAE_DO_PAE=1
             export PAE_DO_PAE_ENHANCE=1
             export PAE_REPORT="$CUMULATIVE_REPORT"
             unset WAIT_JOB  # Parallel
             
             JOB_ID="R${r}_VAL_${case_name}"
-            VAL_JOB_IDS="${VAL_JOB_IDS} ${JOB_ID}"
-            bash "${SCRIPT_DIR}/submit_job.sh" "$JOB_ID" "$BIN_PATH" "${BENCH_ROOT}/${real_case_name}" "${SCRIPT_DIR}/pae_dr.tcl"
+            bash "${SCRIPT_DIR}/submit_job.sh" "$JOB_ID" "$BIN_PATH" "${BENCH_ROOT}/${case_name}" "${SCRIPT_DIR}/pae_dr.tcl"
         done
         
         # Wait for all validation jobs in this round to finish (LSF specific)
         echo "[Round $r] Waiting for validation jobs to complete..."
-        bwait -w "done(ord_pae_*_R${r}_VAL_*)" 2>/dev/null || sleep 60 # Fallback if bwait fails
+        bwait -w "done(ord_pae_R${r}_VAL_*)" 2>/dev/null || sleep 60 # Fallback if bwait fails
         
         # Collect results for all val cases
         for case_name in $VAL_CASES; do
             JOB_ID="R${r}_VAL_${case_name}"
             LATEST_DIR=$(ls -td ord_pae_${JOB_ID}_* 2>/dev/null | head -1)
             if [[ -n "$LATEST_DIR" ]]; then
-                python3 "$COLLECT_SCRIPT" "$r" "Val" "$case_name" "${LATEST_DIR}/ispd19_${case_name}" "$SUMMARY_CSV"
+                python3 "$COLLECT_SCRIPT" "$r" "Val" "$case_name" "${LATEST_DIR}/${case_name}" "$SUMMARY_CSV"
             fi
         done
     fi

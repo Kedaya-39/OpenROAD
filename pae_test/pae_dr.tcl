@@ -13,9 +13,19 @@ set case_name [file tail $case_path]
 source "$ord_root/test/helpers.tcl"
 
 # 2. Read Design Data
-read_lef "$case_path/$case_name.input.lef"
-read_def "$case_path/$case_name.input.def"
-read_guides "$case_path/$case_name.input.guide"
+# Automatically load all LEF files (supports tech + stdcell separated libraries)
+foreach lef_file [glob -nocomplain "$case_path/*.lef"] {
+    read_lef $lef_file
+}
+
+# Load DEF and Guide files (generic glob to handle .input.def or .def)
+foreach def_file [glob -nocomplain "$case_path/*.def"] {
+    read_def $def_file
+}
+
+foreach guide_file [glob -nocomplain "$case_path/*.guide"] {
+    read_guides $guide_file
+}
 
 # 3. Construct detailed route command
 set dr_cmd "detailed_route -output_drc ./drt_output.drc.rpt \
