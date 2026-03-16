@@ -13,16 +13,41 @@ set case_name [file tail $case_path]
 source "$ord_root/test/helpers.tcl"
 
 # 2. Read Design Data
-# Automatically load all LEF files (supports tech + stdcell separated libraries)
-foreach lef_file [glob -nocomplain "$case_path/*.lef"] {
+# Automatically load all LEF files, prioritizing Tech LEF (must be read first)
+set lefs [glob -nocomplain "$case_path/*.lef"]
+if {[llength $lefs] == 0} {
+    puts "Error: No LEF files found in $case_path"
+    exit 1
+}
+
+set tech_lefs {}
+set cell_lefs {}
+
+foreach lef_file $lefs {
+    set lower_name [string tolower [file tail $lef_file]]
+    if {[string match "*tech*" $lower_name] || [string match "*.tlef" $lower_name]} {
+        lappend tech_lefs $lef_file
+    } else {
+        lappend cell_lefs $lef_file
+    }
+}
+
+# Read prioritized Tech LEFs first, then Cell LEFs
+foreach lef_file [concat $tech_lefs $cell_lefs] {
     read_lef $lef_file
 }
 
-# Load DEF and Guide files (generic glob to handle .input.def or .def)
-foreach def_file [glob -nocomplain "$case_path/*.def"] {
+# Load DEF files (must have at least one)
+set defs [glob -nocomplain "$case_path/*.def"]
+if {[llength $defs] == 0} {
+    puts "Error: No DEF files found in $case_path"
+    exit 1
+}
+foreach def_file $defs {
     read_def $def_file
 }
 
+# Load Guide files (optional but recommended for detailed route)
 foreach guide_file [glob -nocomplain "$case_path/*.guide"] {
     read_guides $guide_file
 }
