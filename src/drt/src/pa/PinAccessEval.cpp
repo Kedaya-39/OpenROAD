@@ -229,8 +229,10 @@ void PinAccessEvalMgr::countPatternRipup(frInst* inst)
   }
 
   std::vector<PAEPatternMetrics*> neighbors;
+  bool use_cache = cfg->PAE_ENABLE_NB_CACHE;
   bool found_in_cache = false;
-  {
+
+  if (use_cache) {
     std::lock_guard<std::mutex> lock(cache_mutex_);
     auto it = inst_neighbor_metrics_cache_.find(inst);
     if (it != inst_neighbor_metrics_cache_.end()) {
@@ -279,7 +281,7 @@ void PinAccessEvalMgr::countPatternRipup(frInst* inst)
         }
       }
     }
-    {
+    if (use_cache) {
       std::lock_guard<std::mutex> lock(cache_mutex_);
       inst_neighbor_metrics_cache_[inst] = neighbors;
     }
@@ -595,24 +597,24 @@ void PinAccessEvalMgr::report(const std::string& filename)
   // 7.3.1 Header: PAETechKey
   out << "### PAETechKey:\n";
   out << tech.tech_name << "," << tech.dbu << "," << tech.manufacturing_grid << "\n";
-  
+
   // 7.3.2 PAE Operational Parameters (Weights & Core Constants)
   out << "### PAE PARAMS:\n";
-  out << "W1=" << cfg->PAE_W1 << ",W2=" << cfg->PAE_W2 << ",W3=" << cfg->PAE_W3 
-      << ",W4=" << cfg->PAE_W4 << ",W5=" << cfg->PAE_W5 << ",W6=" << cfg->PAE_W6 << ",W7=" << cfg->PAE_W7 
-      << ",N_TH=" << cfg->PAE_N_TH << ",SEED=" << cfg->PAE_HASH_SEED << "\n";
-  
+  out << "W1=" << cfg->PAE_W1 << ",W2=" << cfg->PAE_W2 << ",W3=" << cfg->PAE_W3
+      << ",W4=" << cfg->PAE_W4 << ",W5=" << cfg->PAE_W5 << ",W6=" << cfg->PAE_W6 << ",W7=" << cfg->PAE_W7
+      << ",N_TH=" << cfg->PAE_N_TH << ",SEED=" << cfg->PAE_HASH_SEED << ",ENABLE_NB_CACHE=" << cfg->PAE_ENABLE_NB_CACHE << "\n";
+
   // Scoring Constants Detail
-  out << "I1_S11=" << cfg->PAE_I1_S11 << ",I1_S12=" << cfg->PAE_I1_S12 
-      << ",I1_S13=" << cfg->PAE_I1_S13 << ",I1_S14=" << cfg->PAE_I1_S14 << ",I1_S15=" << cfg->PAE_I1_S15 
-      << ",I1_S16=" << cfg->PAE_I1_S16 << ",I2_S21=" << cfg->PAE_I2_S21 << ",I2_S22=" << cfg->PAE_I2_S22 
-      << ",I2_S23=" << cfg->PAE_I2_S23 << ",I3_S31=" << cfg->PAE_I3_S31 << ",I6_S61=" << cfg->PAE_I6_S61 
-      << ",I6_S62=" << cfg->PAE_I6_S62 << ",I7_S71=" << cfg->PAE_I7_S71 << ",I7_S72=" << cfg->PAE_I7_S72 
+  out << "I1_S11=" << cfg->PAE_I1_S11 << ",I1_S12=" << cfg->PAE_I1_S12
+      << ",I1_S13=" << cfg->PAE_I1_S13 << ",I1_S14=" << cfg->PAE_I1_S14 << ",I1_S15=" << cfg->PAE_I1_S15
+      << ",I1_S16=" << cfg->PAE_I1_S16 << ",I2_S21=" << cfg->PAE_I2_S21 << ",I2_S22=" << cfg->PAE_I2_S22
+      << ",I2_S23=" << cfg->PAE_I2_S23 << ",I3_S31=" << cfg->PAE_I3_S31 << ",I6_S61=" << cfg->PAE_I6_S61
+      << ",I6_S62=" << cfg->PAE_I6_S62 << ",I7_S71=" << cfg->PAE_I7_S71 << ",I7_S72=" << cfg->PAE_I7_S72
       << ",I7_S73=" << cfg->PAE_I7_S73 << ",I7_S74=" << cfg->PAE_I7_S74 << ",I7_S75=" << cfg->PAE_I7_S75
       << ",I7_S76=" << cfg->PAE_I7_S76 << "\n";
 
   // 7.3.3 Hierarchical Score Data
-  
+
   // CELL SCORE
   out << "### CELL SCORE:\n";
   out << "CellName,FinalScore,UniqueClassNum,PatternNum\n";
@@ -664,7 +666,7 @@ void PinAccessEvalMgr::report(const std::string& filename)
       for (auto& p : it->second) {
         auto pm = ensurePatternMetrics(p.get());
         out << getPAEPatternKey(uc, p.get()) << "," << uc_id << "," << uc->getMaster()->getName() << ","
-            << pm->i1 << "," << pm->i2 << "," << pm->i3 << "," 
+            << pm->i1 << "," << pm->i2 << "," << pm->i3 << ","
             << pm->n_selected.load() << "," << pm->n_ripup.load() << "," << pm->n_nbRipup.load() << ","
             << pm->static_score << "," << pm->dynamic_score << "," << pm->final_score << "\n";
       }
@@ -789,6 +791,7 @@ bool PinAccessEvalMgr::importReport(const std::string& filename)
           else if (key == "W7") cfg->PAE_W7 = std::stod(val);
           else if (key == "N_TH") cfg->PAE_N_TH = std::stoi(val);
           else if (key == "SEED") cfg->PAE_HASH_SEED = std::stoi(val);
+          else if (key == "ENABLE_NB_CACHE") cfg->PAE_ENABLE_NB_CACHE = (bool) std::stoi(val);
           else if (key == "I1_S11") cfg->PAE_I1_S11 = std::stoi(val);
           else if (key == "I1_S12") cfg->PAE_I1_S12 = std::stoi(val);
           else if (key == "I1_S13") cfg->PAE_I1_S13 = std::stoi(val);
@@ -883,6 +886,7 @@ bool PinAccessEvalMgr::importParams(const std::string& filename)
     if (config["PAE_W7"]) cfg->PAE_W7 = config["PAE_W7"].as<double>();
     if (config["PAE_N_TH"]) cfg->PAE_N_TH = config["PAE_N_TH"].as<int>();
     if (config["PAE_HASH_SEED"]) cfg->PAE_HASH_SEED = config["PAE_HASH_SEED"].as<int>();
+    if (config["PAE_ENABLE_NB_CACHE"]) cfg->PAE_ENABLE_NB_CACHE = config["PAE_ENABLE_NB_CACHE"].as<bool>();
     if (config["PAE_I1_S11"]) cfg->PAE_I1_S11 = config["PAE_I1_S11"].as<int>();
     if (config["PAE_I1_S12"]) cfg->PAE_I1_S12 = config["PAE_I1_S12"].as<int>();
     if (config["PAE_I1_S13"]) cfg->PAE_I1_S13 = config["PAE_I1_S13"].as<int>();

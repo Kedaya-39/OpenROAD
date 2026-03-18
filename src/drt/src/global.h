@@ -52,6 +52,7 @@ struct RouterConfiguration
   bool DO_PA = true;
   bool DO_PAE = false;
   bool DO_PAE_ENHANCE = false;
+  bool PAE_ENABLE_NB_CACHE = false;
   bool SINGLE_STEP_DR = false;
   bool SAVE_GUIDE_UPDATES = false;
   int PAE_HASH_SEED = 0;  // Hash seed for PAEPatternKey
