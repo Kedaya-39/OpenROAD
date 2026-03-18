@@ -287,6 +287,9 @@ void FlexPA::genInstRowPatternInit(
       int node_cost = 0;
       if (eval_mgr_ && router_cfg_->DO_PAE_ENHANCE) {
         node_cost = eval_mgr_->getPatternFinalScore(access_pattern);
+        if (node_cost == 0) {
+          node_cost = access_pattern->getCost() * 25;
+        }
       } else {
         node_cost = access_pattern->getCost() * 25;
       }
