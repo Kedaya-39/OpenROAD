@@ -2645,9 +2645,12 @@ void FlexDRWorker::route_queue_update_queue(
   // Record PAE Rip-up
   if (eval_mgr_ && router_cfg_->DO_PAE) {
     std::set<frNet*> reroute_fnets;
+    if (checkingObj != nullptr
+        && checkingObj->typeId() == frBlockObjectEnum::frcNet) {
+      reroute_fnets.insert(static_cast<frNet*>(checkingObj));
+    }
     for (auto& entry : routes) {
-      if (entry.doRoute && entry.block->typeId() == frBlockObjectEnum::drcNet
-          && entry.numReroute > 0) {
+      if (entry.doRoute && entry.block->typeId() == frBlockObjectEnum::drcNet) {
         reroute_fnets.insert(static_cast<drNet*>(entry.block)->getFrNet());
       }
     }
