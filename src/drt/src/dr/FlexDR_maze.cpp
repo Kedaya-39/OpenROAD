@@ -32,6 +32,7 @@
 #include "db/tech/frViaDef.h"
 #include "dr/FlexDR.h"
 #include "dr/FlexMazeTypes.h"
+#include "pa/PinAccessEval.h"
 #include "frBaseTypes.h"
 #include "frDesign.h"
 #include "frProfileTask.h"
@@ -2092,7 +2093,7 @@ void FlexDRWorker::recordPAERipup(const std::vector<std::unique_ptr<frMarker>>& 
   const auto tech = getTech();
 
   for (const auto& uMarker : markers) {
-    const frMarker* marker = uMarker.get();
+    frMarker* marker = uMarker.get();
     bool found_term = false;
 
     // query term
