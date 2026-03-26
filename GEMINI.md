@@ -6,7 +6,7 @@
 3. FastPass: A Fast Pin Access Analysis Framework for Detailed Routability Enhancement
 
 ISPD19的信息：
-1. 共10个测试。除了4和5使用65nm工艺，其他都使用32nm工艺。
+1. 共10个测试。除了4和5使用65nm工艺，其他都使用32nm工艺（但是除了case9、10，其余case的工艺库都不一样）。
 
 pae测试用的脚本在目录 pae_test/ 之下。
 
@@ -54,7 +54,7 @@ main分支是我的毕设的主分支。
 dev分支是我的日常开发分支。
 
 你只能执行git命令中读取类命令(如git log)，不能执行写类命令(如git add, commit, push)。
-你是在办公环境（win10）中。我常用git自带的bash。win的powershell太难用了。
+你是在办公环境（win10）中。我常用git自带的bash。win的powershell太难用了，其不允许使用"&&"将两个命令相连。
 
 办公环境和开发环境各有一个openroad仓库。两个repo源代码的最后一次commit是相同的。开发环境的openroad已完成配置并能编译。办公环境的代码commit需要同步至开发环境已进行编译、测试。
 
