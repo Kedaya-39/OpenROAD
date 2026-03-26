@@ -2642,64 +2642,6 @@ void FlexDRWorker::route_queue_update_queue(
         marker, uniqueVictims, uniqueAggressors, checks, routes, checkingObj);
   }
 
-  // Record PAE Rip-up
-  if (eval_mgr_ && router_cfg_->DO_PAE) {
-    std::set<frNet*> reroute_fnets;
-    if (checkingObj != nullptr
-        && checkingObj->typeId() == frBlockObjectEnum::frcNet) {
-      reroute_fnets.insert(static_cast<frNet*>(checkingObj));
-    }
-    for (auto& entry : routes) {
-      if (entry.doRoute && entry.block->typeId() == frBlockObjectEnum::drcNet) {
-        reroute_fnets.insert(static_cast<drNet*>(entry.block)->getFrNet());
-      }
-    }
-    if (!reroute_fnets.empty()) {
-      std::map<frNet*, std::set<frInst*>> net2bad_insts;
-      for (auto& uMarker : markers) {
-        auto marker = uMarker.get();
-        auto checkObj = [&](frBlockObject* obj) {
-          if (!obj) {
-            return;
-          }
-          if (obj->typeId() == frBlockObjectEnum::frcInstTerm) {
-            auto it = static_cast<frInstTerm*>(obj);
-            if (it->hasNet() && reroute_fnets.count(it->getNet())) {
-              net2bad_insts[it->getNet()].insert(it->getInst());
-            }
-          } else if (obj->typeId() == frBlockObjectEnum::drcPathSeg
-                     || obj->typeId() == frBlockObjectEnum::drcVia
-                     || obj->typeId() == frBlockObjectEnum::drcPatchWire) {
-            auto dr_pin_fig = static_cast<drPinFig*>(obj);
-            if (dr_pin_fig->hasPin()) {
-              auto dr_pin = dr_pin_fig->getPin();
-              if (dr_pin->isInstPin()) {
-                auto it = static_cast<frInstTerm*>(dr_pin->getFrTerm());
-                if (it->hasNet() && reroute_fnets.count(it->getNet())) {
-                  net2bad_insts[it->getNet()].insert(it->getInst());
-                }
-              }
-            }
-          }
-        };
-        for (auto src : marker->getSrcs()) {
-          checkObj(src);
-        }
-        for (auto& agg : marker->getAggressors()) {
-          checkObj(agg.first);
-        }
-        for (auto& vic : marker->getVictims()) {
-          checkObj(vic.first);
-        }
-      }
-      for (auto& [fNet, insts] : net2bad_insts) {
-        for (auto inst : insts) {
-          eval_mgr_->countPatternRipup(inst);
-        }
-      }
-    }
-  }
-
   route_queue_update_queue(checks, routes, rerouteQueue);
 }
 

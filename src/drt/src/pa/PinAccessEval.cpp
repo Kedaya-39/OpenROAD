@@ -223,72 +223,79 @@ void PinAccessEvalMgr::countPatternRipup(frInst* inst)
     m->n_ripup++;
   }
 
-  const auto* cfg = getRouterConfig();
-  if (!cfg || cfg->PAE_I7_S74 <= 0) {
-    return;
-  }
+  // const auto* cfg = getRouterConfig();
+  // if (!cfg || cfg->PAE_I7_S74 <= 0) {
+  //   return;
+  // }
 
-  std::vector<PAEPatternMetrics*> neighbors;
-  bool use_cache = cfg->PAE_ENABLE_NB_CACHE;
-  bool found_in_cache = false;
+  // std::vector<PAEPatternMetrics*> neighbors;
+  // bool use_cache = cfg->PAE_ENABLE_NB_CACHE;
+  // bool found_in_cache = false;
 
-  if (use_cache) {
-    std::lock_guard<std::mutex> lock(cache_mutex_);
-    auto it = inst_neighbor_metrics_cache_.find(inst);
-    if (it != inst_neighbor_metrics_cache_.end()) {
-      neighbors = it->second;
-      found_in_cache = true;
-    }
-  }
+  // if (use_cache) {
+  //   std::lock_guard<std::mutex> lock(cache_mutex_);
+  //   auto it = inst_neighbor_metrics_cache_.find(inst);
+  //   if (it != inst_neighbor_metrics_cache_.end()) {
+  //     neighbors = it->second;
+  //     found_in_cache = true;
+  //   }
+  // }
 
-  if (!found_in_cache) {
-    odb::Rect instBox = inst->getBBox();
-    int h_bloat = (int) (cfg->PAE_I7_S76 * instBox.dx());
-    int v_bloat = (int) (cfg->PAE_I7_S75 * instBox.dy());
+  // if (!found_in_cache) {
+  //   odb::Rect instBox = inst->getBBox();
+  //   int h_bloat = (int) (cfg->PAE_I7_S76 * instBox.dx());
+  //   int v_bloat = (int) (cfg->PAE_I7_S75 * instBox.dy());
 
-    if (h_bloat > 0 || v_bloat > 0) {
-      odb::Rect queryBox(instBox.xMin() - h_bloat,
-                         instBox.yMin() - v_bloat,
-                         instBox.xMax() + h_bloat,
-                         instBox.yMax() + v_bloat);
-      std::set<frInst*> unique_neighbors;
-      for (int i = design_->getTech()->getBottomLayerNum();
-           i <= design_->getTech()->getTopLayerNum();
-           i++) {
-        if (i > cfg->TOP_ROUTING_LAYER) {
-          break;
-        }
-        if (design_->getTech()->getLayer(i)->getType()
-            != odb::dbTechLayerType::ROUTING) {
-          continue;
-        }
-        frRegionQuery::Objects<frBlockObject> query_result;
-        design_->getRegionQuery()->query(queryBox, i, query_result);
+  //   if (h_bloat > 0 || v_bloat > 0) {
+  //     odb::Rect queryBox(instBox.xMin() - h_bloat,
+  //                        instBox.yMin() - v_bloat,
+  //                        instBox.xMax() + h_bloat,
+  //                        instBox.yMax() + v_bloat);
+  //     std::set<frInst*> unique_neighbors;
+  //     for (int i = design_->getTech()->getBottomLayerNum();
+  //          i <= design_->getTech()->getTopLayerNum();
+  //          i++) {
+  //       if (i > cfg->TOP_ROUTING_LAYER) {
+  //         break;
+  //       }
+  //       if (design_->getTech()->getLayer(i)->getType()
+  //           != odb::dbTechLayerType::ROUTING) {
+  //         continue;
+  //       }
+  //       frRegionQuery::Objects<frBlockObject> query_result;
+  //       design_->getRegionQuery()->query(queryBox, i, query_result);
 
-        for (auto& [box, obj] : query_result) {
-          if (obj->typeId() == frcInstTerm) {
-            frInst* nb_inst = static_cast<frInstTerm*>(obj)->getInst();
-            if (nb_inst != inst) {
-              unique_neighbors.insert(nb_inst);
-            }
-          }
-        }
-      }
+  //       for (auto& [box, obj] : query_result) {
+  //         if (obj->typeId() == frcInstTerm) {
+  //           frInst* nb_inst = static_cast<frInstTerm*>(obj)->getInst();
+  //           if (nb_inst != inst) {
+  //             unique_neighbors.insert(nb_inst);
+  //           }
+  //         }
+  //       }
+  //     }
 
-      for (auto nb_inst : unique_neighbors) {
-        if (auto m_nb = ensurePatternMetrics(nb_inst)) {
-          neighbors.push_back(m_nb);
-        }
-      }
-    }
-    if (use_cache) {
-      std::lock_guard<std::mutex> lock(cache_mutex_);
-      inst_neighbor_metrics_cache_[inst] = neighbors;
-    }
-  }
+  //     for (auto nb_inst : unique_neighbors) {
+  //       if (auto m_nb = ensurePatternMetrics(nb_inst)) {
+  //         neighbors.push_back(m_nb);
+  //       }
+  //     }
+  //   }
+  //   if (use_cache) {
+  //     std::lock_guard<std::mutex> lock(cache_mutex_);
+  //     inst_neighbor_metrics_cache_[inst] = neighbors;
+  //   }
+  // }
 
-  for (auto m_nb : neighbors) {
-    m_nb->n_nbRipup++;
+  // for (auto m_nb : neighbors) {
+  //   m_nb->n_nbRipup++;
+  // }
+}
+
+void PinAccessEvalMgr::countPatternNbRipup(frInst* inst)
+{
+  if (auto m = ensurePatternMetrics(inst)) {
+    m->n_nbRipup++;
   }
 }
 

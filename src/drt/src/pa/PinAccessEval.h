@@ -142,6 +142,7 @@ class PinAccessEvalMgr
    * @param inst The cell instance connected to the ripped-up net.
    */
   void countPatternRipup(frInst* inst);
+  void countPatternNbRipup(frInst* inst);
 
   /**
    * @brief Calculates final scores and dynamic metrics.

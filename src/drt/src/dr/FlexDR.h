@@ -1158,6 +1158,9 @@ class FlexDRWorker
                                 const std::vector<FlexMazeIdx>& valid_indices
                                 = {});
 
+  // PAE: record rip-up events for markers produced by GC
+  void recordPAERipup(const std::vector<std::unique_ptr<frMarker>>& markers);
+
   template <class Archive>
   void serialize(Archive& ar, unsigned int version);
   friend class boost::serialization::access;
