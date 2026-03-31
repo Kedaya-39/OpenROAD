@@ -2127,8 +2127,8 @@ void FlexDRWorker::recordPAERipup(const std::vector<std::unique_ptr<frMarker>>& 
     odb::Rect markerBox = marker->getBBox();
     frLayerNum markerLayer = marker->getLayerNum();
     // Use design doc formula: expansion = s76 * width
-    int h_bloat = (int) (router_cfg_->PAE_I7_S76 * markerBox.dx() * 10);
-    int v_bloat = (int) (router_cfg_->PAE_I7_S75 * markerBox.dy() * 10);
+    int h_bloat = (int) (router_cfg_->PAE_I7_S76 * markerBox.dx());
+    int v_bloat = (int) (router_cfg_->PAE_I7_S75 * markerBox.dy());
     if (h_bloat <= 0 && v_bloat <= 0) {
       continue;
     }
