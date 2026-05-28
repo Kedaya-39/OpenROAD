@@ -26,6 +26,7 @@
 #include "odb/geom.h"
 #include "omp.h"
 #include "pa/FlexPA.h"
+#include "pa/PinAccessEval.h"
 #include "serialization.h"
 #include "utl/Logger.h"
 #include "utl/exception.h"
@@ -283,7 +284,16 @@ void FlexPA::genInstRowPatternInit(
          acc_pattern_idx++) {
       nodes[inst_idx][acc_pattern_idx] = std::make_unique<FlexDPNode>();
       auto access_pattern = inst_patterns[acc_pattern_idx].get();
-      nodes[inst_idx][acc_pattern_idx]->setNodeCost(access_pattern->getCost());
+      int node_cost = 0;
+      if (eval_mgr_ && router_cfg_->DO_PAE_ENHANCE) {
+        node_cost = eval_mgr_->getPatternFinalScore(access_pattern);
+        if (node_cost == 0) {
+          node_cost = access_pattern->getCost() * 25;
+        }
+      } else {
+        node_cost = access_pattern->getCost() * 25;
+      }
+      nodes[inst_idx][acc_pattern_idx]->setNodeCost(node_cost);
       nodes[inst_idx][acc_pattern_idx]->setIdx({inst_idx, acc_pattern_idx});
     }
   }
@@ -354,6 +364,10 @@ void FlexPA::genInstRowPatternCommit(
     inst_access_pattern_idx[curr_inst_idx] = curr_acc_patterns_idx;
 
     frInst* inst = insts[curr_inst_idx];
+    inst->setPaPatternIdx(curr_acc_patterns_idx);
+    if (eval_mgr_) {
+      eval_mgr_->countPatternSelection(inst);
+    }
     int access_point_idx = 0;
     auto unique_class = unique_insts_.getUniqueClass(inst);
     auto access_pattern
@@ -474,7 +488,7 @@ int FlexPA::getEdgeCost(FlexDPNode* prev_node,
     const int curr_node_cost = curr_node->getNodeCost();
     edge_cost = (prev_node_cost + curr_node_cost) / 2;
   } else {
-    edge_cost = 1000;
+    edge_cost = 1000000;
   }
 
   return edge_cost;

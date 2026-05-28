@@ -2,6 +2,7 @@
 // Copyright (c) 2019-2025, The OpenROAD Authors
 
 #include "pa/FlexPA.h"
+#include "pa/PinAccessEval.h"
 
 #include <cstdint>
 #include <fstream>
@@ -62,13 +63,18 @@ static inline void serializePatterns(
 FlexPA::FlexPA(frDesign* in,
                utl::Logger* logger,
                dst::Distributed* dist,
-               RouterConfiguration* router_cfg)
+               RouterConfiguration* router_cfg,
+               PinAccessEvalMgr* eval_mgr)
     : design_(in),
       logger_(logger),
       dist_(dist),
       router_cfg_(router_cfg),
+      eval_mgr_(eval_mgr),
       unique_insts_(design_, target_insts_, logger_, router_cfg)
 {
+  if (eval_mgr_) {
+    eval_mgr_->setPA(this);
+  }
 }
 
 // must be out-of-line due to the unique_ptr
@@ -325,6 +331,11 @@ void FlexPA::prepPattern()
   if (router_cfg_->VERBOSE > 0) {
     logger_->info(DRT, 81, "  Complete {} unique inst patterns.", cnt);
   }
+  
+  if (eval_mgr_ && router_cfg_->DO_PAE) {
+    eval_mgr_->runStaticAnalysis();
+  }
+
   if (isDistributed()) {
     dst::JobMessage msg(dst::JobMessage::kPinAccess,
                         dst::JobMessage::kBroadcast),

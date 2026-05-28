@@ -14,6 +14,7 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${PROJECT_SOURCE_DIR}/cmake)
 include(CheckIPOSupported)
 check_ipo_supported(RESULT ipo_supported OUTPUT error)
 
+find_package(yaml-cpp REQUIRED)
 find_package(Boost CONFIG REQUIRED COMPONENTS serialization)
 find_package(OpenMP REQUIRED)
 find_package(VTune)
@@ -89,6 +90,7 @@ add_library(drt_lib
   src/pa/FlexPA_acc_pattern.cpp
   src/pa/FlexPA_row_pattern.cpp
   src/pa/FlexPA_unique.cpp
+  src/pa/PinAccessEval.cpp
   src/rp/FlexRP_init.cpp
   src/rp/FlexRP.cpp
   src/rp/FlexRP_prep.cpp
@@ -117,6 +119,7 @@ target_link_libraries(drt_lib
     OpenMP::OpenMP_CXX
     ${Boost_LIBRARIES}
     ZLIB::ZLIB
+    yaml-cpp
 )
 
 target_sources(drt

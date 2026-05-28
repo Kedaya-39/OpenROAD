@@ -26,6 +26,7 @@
 #include "db/obj/frShape.h"
 #include "db/obj/frVia.h"
 #include "dr/FlexDR.h"
+#include "pa/PinAccessEval.h"
 #include "dr/FlexGridGraph.h"
 #include "dr/FlexMazeTypes.h"
 #include "frBaseTypes.h"

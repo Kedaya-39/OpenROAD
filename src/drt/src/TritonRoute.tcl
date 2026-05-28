@@ -26,6 +26,10 @@ sta::define_cmd_args "detailed_route" {
     [-clean_patches]
     [-no_pin_access]
     [-min_access_points count]
+    [-do_pae]
+    [-do_pae_enhance]
+    [-pae_report filename]
+    [-pae_para filename]
     [-save_guide_updates]
     [-repair_pdn_vias layer]
     [-single_step_dr]
@@ -37,14 +41,31 @@ proc detailed_route { args } {
       -db_process_node -droute_end_iter -via_in_pin_bottom_layer \
       -via_in_pin_top_layer -via_access_layer -or_seed -or_k -bottom_routing_layer \
       -top_routing_layer -verbose -remote_host -remote_port -shared_volume \
-      -cloud_size -min_access_points -repair_pdn_vias -drc_report_iter_step} \
+      -cloud_size -min_access_points -repair_pdn_vias -drc_report_iter_step -pae_report -pae_para} \
     flags {-disable_via_gen -distributed -clean_patches -no_pin_access \
-           -single_step_dr -save_guide_updates}
+           -do_pae -do_pae_enhance -single_step_dr -save_guide_updates}
   sta::check_argc_eq0 "detailed_route" $args
 
   set enable_via_gen [expr ![info exists flags(-disable_via_gen)]]
   set clean_patches [expr [info exists flags(-clean_patches)]]
   set no_pin_access [expr [info exists flags(-no_pin_access)]]
+  set do_pae [expr [info exists flags(-do_pae)]]
+  set do_pae_enhance [expr [info exists flags(-do_pae_enhance)]]
+  if { [info exists keys(-pae_report)] } {
+    set pae_report $keys(-pae_report)
+    set do_pae 1
+  } else {
+    set pae_report ""
+  }
+  if { [info exists keys(-pae_para)] } {
+    set pae_para $keys(-pae_para)
+    set do_pae 1
+  } else {
+    set pae_para ""
+  }
+  if { $do_pae_enhance } {
+    set do_pae 1
+  }
   # single_step_dr is not a user option but is intended for algorithm
   # development.  It is not listed in the help string intentionally.
   set single_step_dr [expr [info exists flags(-single_step_dr)]]
@@ -169,7 +190,8 @@ proc detailed_route { args } {
     $via_in_pin_bottom_layer $via_in_pin_top_layer \
     $via_access_layer $or_seed $or_k $verbose \
     $clean_patches $no_pin_access $single_step_dr $min_access_points \
-    $save_guide_updates $repair_pdn_vias $drc_report_iter_step
+    $save_guide_updates $repair_pdn_vias $drc_report_iter_step \
+    $do_pae $do_pae_enhance $pae_report $pae_para
 }
 
 proc detailed_route_num_drvs { args } {
@@ -457,6 +479,25 @@ proc detailed_route_set_unidirectional_layer { args } {
   drt::detailed_route_set_unidirectional_layer $args
 }
 
+sta::define_cmd_args "report_pin_acc" {
+    [-file filename]
+}
+
+proc report_pin_acc { args } {
+  sta::parse_key_args "report_pin_acc" args \
+    keys {-file} \
+    flags {}
+  sta::check_argc_eq0 "report_pin_acc" $args
+
+  if { [info exists keys(-file)] } {
+    set report_file $keys(-file)
+  } else {
+    set report_file ""
+  }
+
+  drt::report_pin_acc_cmd $report_file
+}
+
 namespace eval drt {
 proc step_dr { args } {
   # args match FlexDR::SearchRepairArgs
@@ -502,3 +543,4 @@ proc fix_max_spacing { args } {
   drt::fix_max_spacing_cmd
 }
 }
+

@@ -44,6 +44,7 @@ class frInst : public frRef
     return instBlockages_;
   }
   int getPinAccessIdx() const { return pinAccessIdx_; }
+  int getPaPatternIdx() const { return paPatternIdx_; }
   bool isToBeDeleted() const { return toBeDeleted_; }
   // setters
   void addInstTerm(std::unique_ptr<frInstTerm> in)
@@ -56,6 +57,7 @@ class frInst : public frRef
     instBlockages_.push_back(std::move(in));
   }
   void setPinAccessIdx(int in) { pinAccessIdx_ = in; }
+  void setPaPatternIdx(int in) { paPatternIdx_ = in; }
   void deletePinAccessIdx() { pinAccessIdx_ = -1; }
   bool hasPinAccessIdx() { return pinAccessIdx_ != -1; }
   void setToBeDeleted(bool in) { toBeDeleted_ = in; }
@@ -143,6 +145,7 @@ class frInst : public frRef
   odb::dbTransform xform_;
   odb::dbTransform latest_pa_xform_;
   int pinAccessIdx_{-1};
+  int paPatternIdx_{-1};
   bool toBeDeleted_{false};
   bool has_pin_access_update_{true};
 };

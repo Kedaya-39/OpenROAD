@@ -50,8 +50,53 @@ struct RouterConfiguration
   bool ENABLE_VIA_GEN = true;
   bool CLEAN_PATCHES = false;
   bool DO_PA = true;
+  bool DO_PAE = false;
+  bool DO_PAE_ENHANCE = false;
+  bool PAE_ENABLE_NB_CACHE = false;
   bool SINGLE_STEP_DR = false;
   bool SAVE_GUIDE_UPDATES = false;
+  int PAE_HASH_SEED = 0;  // Hash seed for PAEPatternKey
+  std::string PAE_REPORT_FILE;
+  std::string PAE_PARA_FILE;
+
+  // weights and constants for PAE (Pin Access Evaluation)
+  double PAE_W1 = 0.1;   // I1: Track Alignment
+  double PAE_W2 = 0.1;   // I2: Access Directions
+  double PAE_W3 = 0.1;   // I3: Spatial Sparsity
+  double PAE_W4 = 0;     // I4: Track Occupation (reserved)
+  double PAE_W5 = 0.1;   // I5: Pattern Capacity
+  double PAE_W6 = 0.1;  // I6: Pattern Diversity
+  double PAE_W7 = 0.5;   // I7: Rip-up Frequency (Dynamic)
+
+  int PAE_N_TH = 10;  // Capacity threshold
+
+  // I1 scoring constants
+  int PAE_I1_S11 = 0;   // OnGrid
+  int PAE_I1_S12 = 1;   // HalfGrid
+  int PAE_I1_S13 = 2;   // Center
+  int PAE_I1_S14 = 5;   // EncOpt
+  int PAE_I1_S15 = 10;  // Others
+  int PAE_I1_S16 = 4;   // Upper layer multiplier
+
+  // I2 scoring constants
+  int PAE_I2_S21 = 8;  // Base score
+  int PAE_I2_S22 = 4;  // Via access deduction
+  int PAE_I2_S23 = 1;  // Planar direction deduction
+
+  // I3 scoring constants
+  int PAE_I3_S31 = 1000;  // Variance constant
+
+  // I6 scoring constants
+  double PAE_I6_S61 = 0.5;  // Coverage weight
+  double PAE_I6_S62 = 0.5;  // Jaccard distance weight
+
+  // I7 scoring constants
+  double PAE_I7_S71 = 1.5;     // Rip-up penalty factor
+  double PAE_I7_S72 = 1.0;     // Selection bonus factor
+  double PAE_I7_S73 = -0.001;  // Sigmoid slope
+  double PAE_I7_S74 = 0.5;     // Neighbor rip-up penalty factor
+  double PAE_I7_S75 = 10;       // Neighbor search window height expansion multiplier
+  double PAE_I7_S76 = 10;       // Neighbor search window width expansion multiplier
 
   std::string VIAINPIN_BOTTOMLAYER_NAME;
   std::string VIAINPIN_TOPLAYER_NAME;
@@ -63,6 +108,7 @@ struct RouterConfiguration
 
   int MINNUMACCESSPOINT_MACROCELLPIN = 3;
   int MINNUMACCESSPOINT_STDCELLPIN = 3;
+  int PA_MIN_ON_GRID_CANDIDATES = 3;
   int ACCESS_PATTERN_END_ITERATION_NUM = 10;
   float CONGESTION_THRESHOLD = 0.4;
   int MAX_CLIPSIZE_INCREASE = 18;

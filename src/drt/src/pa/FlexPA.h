@@ -79,6 +79,7 @@ class FlexDPNode;
 class AbstractPAGraphics;
 class frViaDef;
 class frInstTerm;
+class PinAccessEvalMgr;
 
 class FlexPA
 {
@@ -99,7 +100,8 @@ class FlexPA
   FlexPA(frDesign* in,
          utl::Logger* logger,
          dst::Distributed* dist,
-         RouterConfiguration* router_cfg);
+         RouterConfiguration* router_cfg,
+         PinAccessEvalMgr* eval_mgr);
   ~FlexPA();
 
   void setDebug(std::unique_ptr<AbstractPAGraphics> pa_graphics);
@@ -119,11 +121,15 @@ class FlexPA
 
   int main();
 
+  UniqueInsts* getUniqueInsts() { return &unique_insts_; }
+  PinAccessEvalMgr* getPinAccessEvalMgr() { return eval_mgr_; }
+
  private:
   frDesign* design_;
   utl::Logger* logger_;
   dst::Distributed* dist_;
   RouterConfiguration* router_cfg_;
+  PinAccessEvalMgr* eval_mgr_;
 
   std::unique_ptr<AbstractPAGraphics> graphics_;
   std::string debugPinName_;
@@ -955,6 +961,7 @@ class FlexPA
       std::vector<std::unique_ptr<frVia>>& vias,
       bool isPrev);
 
+  friend class PinAccessEvalMgr;
   friend class RoutingCallBack;
 };
 

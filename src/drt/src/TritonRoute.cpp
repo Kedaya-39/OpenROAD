@@ -48,6 +48,7 @@
 #include "odb/dbTypes.h"
 #include "pa/AbstractPAGraphics.h"
 #include "pa/FlexPA.h"
+#include "pa/PinAccessEval.h"
 #include "rp/FlexRP.h"
 #include "serialization.h"
 #include "stt/SteinerTreeBuilder.h"
@@ -231,7 +232,7 @@ std::string TritonRoute::runDRWorker(const std::string& workerStr,
                                      FlexDRViaData* viaData)
 {
   auto worker = FlexDRWorker::load(
-      workerStr, viaData, design_.get(), logger_, router_cfg_.get());
+      workerStr, viaData, design_.get(), logger_, router_cfg_.get(), pin_access_eval_mgr_.get());
   worker->setSharedVolume(shared_volume_);
   worker->setDebugSettings(debug_.get());
   if (graphics_factory_->guiActive() && debug_->debugDR) {
@@ -262,8 +263,12 @@ void TritonRoute::debugSingleWorker(const std::string& dumpDir,
   std::string workerStr((std::istreambuf_iterator<char>(workerFile)),
                         std::istreambuf_iterator<char>());
   workerFile.close();
-  auto worker = FlexDRWorker::load(
-      workerStr, &viaData, design_.get(), logger_, router_cfg_.get());
+  auto worker = FlexDRWorker::load(workerStr,
+                                   &viaData,
+                                   design_.get(),
+                                   logger_,
+                                   router_cfg_.get(),
+                                   pin_access_eval_mgr_.get());
   std::unique_ptr<AbstractDRGraphics> graphics
       = debug_->debugDR ? graphics_factory_->makeUniqueDRGraphics() : nullptr;
   worker->setGraphics(graphics.get());
@@ -672,7 +677,7 @@ void TritonRoute::dr()
 {
   num_drvs_ = -1;
   dr_ = std::make_unique<FlexDR>(
-      this, getDesign(), logger_, db_, router_cfg_.get());
+      this, getDesign(), logger_, db_, router_cfg_.get(), pin_access_eval_mgr_.get());
   if (debug_->debugDR) {
     dr_->setDebug(graphics_factory_->makeUniqueDRGraphics());
   }
@@ -711,6 +716,9 @@ void TritonRoute::stepDR(int size,
 }
 void TritonRoute::endFR()
 {
+  if (pin_access_eval_mgr_ && router_cfg_->DO_PAE) {
+    pin_access_eval_mgr_->runDynamicAnalysis();
+  }
   if (router_cfg_->SINGLE_STEP_DR) {
     dr_->end(/* done */ true);
   }
@@ -1024,8 +1032,20 @@ int TritonRoute::main()
     return 0;
   }
   if (router_cfg_->DO_PA) {
+    if (router_cfg_->DO_PAE && !pin_access_eval_mgr_) {
+      pin_access_eval_mgr_ = std::make_unique<PinAccessEvalMgr>(
+          getDesign(), db_, nullptr, logger_);
+    }
+    if (pin_access_eval_mgr_) {
+      if (!router_cfg_->PAE_PARA_FILE.empty()) {
+        pin_access_eval_mgr_->importParams(router_cfg_->PAE_PARA_FILE);
+      }
+      if (!router_cfg_->PAE_REPORT_FILE.empty()) {
+        pin_access_eval_mgr_->importReport(router_cfg_->PAE_REPORT_FILE);
+      }
+    }
     pa_ = std::make_unique<FlexPA>(
-        getDesign(), logger_, dist_, router_cfg_.get());
+        getDesign(), logger_, dist_, router_cfg_.get(), pin_access_eval_mgr_.get());
     pa_->setDistributed(dist_ip_, dist_port_, shared_volume_, cloud_sz_);
     if (debug_->debugPA) {
       pa_->setDebug(graphics_factory_->makeUniquePAGraphics());
@@ -1093,20 +1113,36 @@ void TritonRoute::pinAccess(const std::vector<odb::dbInst*>& target_insts)
   }
   clearDesign();
   router_cfg_->ENABLE_VIA_GEN = true;
-  initDesign();
-  pa_ = std::make_unique<FlexPA>(
-      getDesign(), logger_, dist_, router_cfg_.get());
-  pa_->setTargetInstances(target_insts);
-  if (debug_->debugPA) {
-    pa_->setDebug(graphics_factory_->makeUniquePAGraphics());
+  if (router_cfg_->DO_PA) {
+    if (router_cfg_->DO_PAE && !pin_access_eval_mgr_) {
+      pin_access_eval_mgr_ = std::make_unique<PinAccessEvalMgr>(
+          getDesign(), db_, nullptr, logger_);
+    }
+    if (pin_access_eval_mgr_) {
+      if (!router_cfg_->PAE_PARA_FILE.empty()) {
+        pin_access_eval_mgr_->importParams(router_cfg_->PAE_PARA_FILE);
+      }
+      if (!router_cfg_->PAE_REPORT_FILE.empty()) {
+        pin_access_eval_mgr_->importReport(router_cfg_->PAE_REPORT_FILE);
+      }
+    }
+    pa_ = std::make_unique<FlexPA>(getDesign(),
+                                   logger_,
+                                   dist_,
+                                   router_cfg_.get(),
+                                   pin_access_eval_mgr_.get());
+    pa_->setTargetInstances(target_insts);
+    if (debug_->debugPA) {
+      pa_->setDebug(graphics_factory_->makeUniquePAGraphics());
+    }
+    if (distributed_) {
+      pa_->setDistributed(dist_ip_, dist_port_, shared_volume_, cloud_sz_);
+      dist_pool_->join();
+    }
+    pa_->main();
+    io::Writer writer(getDesign(), logger_);
+    writer.updateDb(db_, router_cfg_.get(), true);
   }
-  if (distributed_) {
-    pa_->setDistributed(dist_ip_, dist_port_, shared_volume_, cloud_sz_);
-    dist_pool_->join();
-  }
-  pa_->main();
-  io::Writer writer(getDesign(), logger_);
-  writer.updateDb(db_, router_cfg_.get(), true);
 }
 
 void TritonRoute::deleteInstancePAData(frInst* inst, bool delete_inst)
@@ -1149,7 +1185,7 @@ void TritonRoute::fixMaxSpacing(int num_threads)
   prep();
   router_cfg_->MAX_THREADS = num_threads;
   dr_ = std::make_unique<FlexDR>(
-      this, getDesign(), logger_, db_, router_cfg_.get());
+      this, getDesign(), logger_, db_, router_cfg_.get(), pin_access_eval_mgr_.get());
   dr_->init();
   dr_->fixMaxSpacing();
   io::Writer writer(getDesign(), logger_);
@@ -1301,6 +1337,10 @@ void TritonRoute::setParams(const ParamStruct& params)
   router_cfg_->DBPROCESSNODE = params.dbProcessNode;
   router_cfg_->CLEAN_PATCHES = params.cleanPatches;
   router_cfg_->DO_PA = params.doPa;
+  router_cfg_->DO_PAE = params.doPae;
+  router_cfg_->DO_PAE_ENHANCE = params.doPaeEnhance;
+  router_cfg_->PAE_REPORT_FILE = params.paeReportFile;
+  router_cfg_->PAE_PARA_FILE = params.paeParaFile;
   router_cfg_->SINGLE_STEP_DR = params.singleStepDR;
   if (!params.viaInPinBottomLayer.empty()) {
     router_cfg_->VIAINPIN_BOTTOMLAYER_NAME = params.viaInPinBottomLayer;
@@ -1487,6 +1527,16 @@ std::vector<int> TritonRoute::routeLayerLengths(odb::dbWire* wire) const
   }
 
   return lengths;
+}
+
+void TritonRoute::reportPinAccessEval(const std::string& report_file)
+{
+  if (pin_access_eval_mgr_) {
+    pin_access_eval_mgr_->calculateScores();
+    pin_access_eval_mgr_->report(report_file);
+  } else {
+    logger_->error(utl::DRT, 1008, "Pin access evaluation manager not initialized.");
+  }
 }
 
 }  // namespace drt

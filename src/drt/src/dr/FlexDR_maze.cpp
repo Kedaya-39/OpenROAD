@@ -32,6 +32,7 @@
 #include "db/tech/frViaDef.h"
 #include "dr/FlexDR.h"
 #include "dr/FlexMazeTypes.h"
+#include "pa/PinAccessEval.h"
 #include "frBaseTypes.h"
 #include "frDesign.h"
 #include "frProfileTask.h"
@@ -1925,6 +1926,7 @@ void FlexDRWorker::route_queue_main(std::queue<RouteQueueEntry>& rerouteQueue)
         initMazeCost_via_helper(net, false);
       }
       net->clear();
+
       if (getDRIter() >= beginDebugIter) {
         logger_->info(DRT, 2002, "Routing net {}", net->getFrNet()->getName());
       }
@@ -2063,6 +2065,7 @@ void FlexDRWorker::route_queue_main(std::queue<RouteQueueEntry>& rerouteQueue)
     }
     // end
     if (didCheck) {
+      recordPAERipup(gcWorker_->getMarkers());
       route_queue_update_queue(gcWorker_->getMarkers(), rerouteQueue, obj);
     }
     if (didRoute) {
@@ -2076,6 +2079,78 @@ void FlexDRWorker::route_queue_main(std::queue<RouteQueueEntry>& rerouteQueue)
       if (obj->typeId() == drcNet && doRoute) {
         auto net = static_cast<drNet*>(obj);
         graphics_->endNet(net);
+      }
+    }
+  }
+}
+
+void FlexDRWorker::recordPAERipup(const std::vector<std::unique_ptr<frMarker>>& markers)
+{
+  if (!eval_mgr_ || !router_cfg_->DO_PAE) {
+    return;
+  }
+
+  const auto tech = getTech();
+
+  for (const auto& uMarker : markers) {
+    frMarker* marker = uMarker.get();
+    bool found_term = false;
+
+    // query term
+    for (auto src : marker->getSrcs()) {
+      if (src && src->typeId() == frcInstTerm) {
+        eval_mgr_->countPatternRipup(static_cast<frInstTerm*>(src)->getInst());
+        found_term = true;
+      }
+    }
+
+    for (const auto& agg : marker->getAggressors()) {
+      if (agg.first && agg.first->typeId() == frcInstTerm) {
+        eval_mgr_->countPatternRipup(
+            static_cast<frInstTerm*>(agg.first)->getInst());
+        found_term = true;
+      }
+    }
+
+    for (const auto& vic : marker->getVictims()) {
+      if (vic.first && vic.first->typeId() == frcInstTerm) {
+        eval_mgr_->countPatternRipup(
+            static_cast<frInstTerm*>(vic.first)->getInst());
+        found_term = true;
+      }
+    }
+
+    // query neighbor
+    if (found_term || router_cfg_->PAE_I7_S74 <= 0) {
+      continue;
+    }
+    odb::Rect markerBox = marker->getBBox();
+    frLayerNum markerLayer = marker->getLayerNum();
+    // Use design doc formula: expansion = s76 * width
+    int h_bloat = (int) (router_cfg_->PAE_I7_S76 * markerBox.dx());
+    int v_bloat = (int) (router_cfg_->PAE_I7_S75 * markerBox.dy());
+    if (h_bloat <= 0 && v_bloat <= 0) {
+      continue;
+    }
+     odb::Rect queryBox(markerBox.xMin() - h_bloat, markerBox.yMin() - v_bloat,
+                        markerBox.xMax() + h_bloat, markerBox.yMax() + v_bloat);
+
+    frLayerNum sLayer = (markerLayer > 3 ? markerLayer - 3 : tech->getBottomLayerNum());
+    frLayerNum eLayer = (markerLayer + 3 < tech->getTopLayerNum() ? markerLayer + 3 : tech->getTopLayerNum());
+    for (frLayerNum lNum = sLayer; lNum <= eLayer; ++lNum) {
+      if (lNum > router_cfg_->TOP_ROUTING_LAYER) {
+        break;
+      }
+      if (tech->getLayer(lNum)->getType() != odb::dbTechLayerType::ROUTING) {
+        continue;
+      }
+
+      frRegionQuery::Objects<frBlockObject> query_result;
+      design_->getRegionQuery()->query(queryBox, lNum, query_result);
+      for (auto& [box, obj] : query_result) {
+        if (obj->typeId() == frcInstTerm) {
+          eval_mgr_->countPatternNbRipup(static_cast<frInstTerm*>(obj)->getInst());
+        }
       }
     }
   }

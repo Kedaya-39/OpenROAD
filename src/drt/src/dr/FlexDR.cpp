@@ -106,13 +106,15 @@ FlexDR::FlexDR(TritonRoute* router,
                frDesign* designIn,
                utl::Logger* loggerIn,
                odb::dbDatabase* dbIn,
-               RouterConfiguration* router_cfg)
+               RouterConfiguration* router_cfg,
+               PinAccessEvalMgr* eval_mgr)
     : flow_state_machine_(std::make_unique<FlexDRFlow>()),
       router_(router),
       design_(designIn),
       logger_(loggerIn),
       db_(dbIn),
       router_cfg_(router_cfg),
+      eval_mgr_(eval_mgr),
       numWorkUnits_(0),
       dist_(nullptr),
       dist_on_(false),
@@ -562,7 +564,7 @@ std::unique_ptr<FlexDRWorker> FlexDR::createWorker(const int x_offset,
                                                    const odb::Rect& routeBoxIn)
 {
   auto worker = std::make_unique<FlexDRWorker>(
-      &via_data_, getDesign(), logger_, router_cfg_);
+      &via_data_, getDesign(), logger_, router_cfg_, eval_mgr_);
   odb::Rect route_box(routeBoxIn);
   if (route_box == odb::Rect(0, 0, 0, 0)) {
     auto gCellPatterns = getDesign()->getTopBlock()->getGCellPatterns();
@@ -1870,7 +1872,7 @@ void FlexDR::fixMaxSpacing()
   for (size_t i = 0; i < merged_regions.size(); i++) {
     auto route_box = merged_regions.at(i);
     auto worker = std::make_unique<FlexDRWorker>(
-        &via_data_, design_, logger_, router_cfg_);
+        &via_data_, design_, logger_, router_cfg_, eval_mgr_);
     odb::Rect ext_box;
     odb::Rect drc_box;
     route_box.bloat(router_cfg_->MTSAFEDIST, ext_box);
@@ -2156,10 +2158,11 @@ std::unique_ptr<FlexDRWorker> FlexDRWorker::load(
     FlexDRViaData* via_data,
     frDesign* design,
     utl::Logger* logger,
-    RouterConfiguration* router_cfg)
+    RouterConfiguration* router_cfg,
+    PinAccessEvalMgr* eval_mgr)
 {
   auto worker
-      = std::make_unique<FlexDRWorker>(via_data, design, logger, router_cfg);
+      = std::make_unique<FlexDRWorker>(via_data, design, logger, router_cfg, eval_mgr);
   deserializeWorker(worker.get(), design, workerStr);
   return worker;
 }

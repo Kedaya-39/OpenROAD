@@ -97,7 +97,7 @@ void FlexPA::genAPCentered(std::map<frCoord, frAccessPointEnum>& coords,
       candidates_on_grid++;
     }
   }
-  if (candidates_on_grid >= 3) {
+  if (candidates_on_grid >= router_cfg_->PA_MIN_ON_GRID_CANDIDATES) {
     return;
   }
 

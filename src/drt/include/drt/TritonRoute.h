@@ -48,6 +48,7 @@ class FlexDR;
 class FlexPA;
 class FlexTA;
 class FlexDRWorker;
+class PinAccessEvalMgr;
 class drUpdate;
 struct frDebugSettings;
 struct FlexDRViaData;
@@ -74,6 +75,10 @@ struct ParamStruct
   int verbose = 1;
   bool cleanPatches = false;
   bool doPa = false;
+  bool doPae = false;
+  bool doPaeEnhance = false;
+  std::string paeReportFile;
+  std::string paeParaFile;
   bool singleStepDR = false;
   int minAccessPoints = -1;
   bool saveGuideUpdates = false;
@@ -99,11 +104,16 @@ class TritonRoute
   {
     return router_cfg_.get();
   }
+  PinAccessEvalMgr* getPinAccessEvalMgr() const
+  {
+    return pin_access_eval_mgr_.get();
+  }
 
   int main();
   void endFR();
   void pinAccess(const std::vector<odb::dbInst*>& target_insts
                  = std::vector<odb::dbInst*>());
+  void reportPinAccessEval(const std::string& report_file);
   void stepDR(int size,
               int offset,
               int mazeEndIter,
@@ -210,6 +220,7 @@ class TritonRoute
   unsigned int cloud_sz_{0};
   std::optional<boost::asio::thread_pool> dist_pool_;
   std::unique_ptr<FlexPA> pa_{nullptr};
+  std::unique_ptr<PinAccessEvalMgr> pin_access_eval_mgr_{nullptr};
   std::unique_ptr<AbstractGraphicsFactory> graphics_factory_{nullptr};
 
   void initDesign();
