@@ -91,7 +91,7 @@ struct RouterConfiguration
   double PAE_I6_S62 = 0.5;  // Jaccard distance weight
 
   // I7 scoring constants
-  double PAE_I7_S71 = 1.5;     // Rip-up penalty factor
+  double PAE_I7_S71 = 1.0;     // Rip-up penalty factor
   double PAE_I7_S72 = 1.0;     // Selection bonus factor
   double PAE_I7_S73 = -0.001;  // Sigmoid slope
   double PAE_I7_S74 = 0.5;     // Neighbor rip-up penalty factor
